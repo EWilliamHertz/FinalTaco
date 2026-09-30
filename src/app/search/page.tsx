@@ -32,7 +32,7 @@ export default function SearchPage() {
         if (activeGame === "mtg") {
           // Scryfall API
           let query = "";
-          if (name) query += `"${name}" `;
+          if (name) query += `${name} `; // Scryfall does fuzzy search natively without quotes
           if (set) query += `set:${set} `;
           if (number) query += `cn:${number} `;
           
@@ -50,9 +50,13 @@ export default function SearchPage() {
         } else if (activeGame === "pokemon") {
           // Pokemon TCG API
           let query = "";
-          if (name) query += `name:"*${name}*" `;
-          if (set) query += `set.ptcgoCode:"${set}" `; // approximation
-          if (number) query += `number:"${number}" `;
+          if (name) {
+            // Pokémon API supports wildcards like name:charizard*
+            const safeName = name.replace(/[^a-zA-Z0-9 ]/g, ''); // strip special chars for safety
+            query += `name:${safeName.split(' ').join('* ')}* `; 
+          }
+          if (set) query += `set.id:${set}* `; 
+          if (number) query += `number:${number} `;
           
           const res = await fetch(`https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(query.trim())}`);
           const data = await res.json();
