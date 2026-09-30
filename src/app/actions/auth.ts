@@ -93,3 +93,22 @@ export async function registerUser(email: string, username: string, pass: string
     return { success: false, error: "Failed to register" };
   }
 }
+
+export async function getCurrentUser() {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("auth_token")?.value;
+    if (!token) return null;
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "hatakesecret") as { userId: string };
+    if (!decoded.userId) return null;
+    
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, username: true, avatarUrl: true, email: true }
+    });
+    return user;
+  } catch (err) {
+    return null;
+  }
+}
