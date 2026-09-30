@@ -7,7 +7,7 @@ import { useGameStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-const generateFeed = (game: string | null) => {
+const generateFeed = (game: string | null): any[] => {
   return []; // Placeholder data removed
 };
 
