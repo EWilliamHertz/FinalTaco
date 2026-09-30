@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String         @id @default(uuid())
+  email             String         @unique
+  username          String         @unique
+  password          String
+  role              Role           @default(USER)
+  verified          Boolean        @default(false)
+  verificationToken String?
+  avatarUrl         String?
+  reputationScore   Float          @default(0.0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  CardInstances     CardInstance[]
+  MarketListings    MarketListing[]
+  Posts             Post[]
+  Purchases         Deal[]         @relation("BuyerDeals")
+  Sales             Deal[]         @relation("SellerDeals")
+}
+
+model CardReference {
+  id           String         @id @default(uuid())
+  game         GameType
+  tcgcsvId     String         @unique // Map to TCGCSV API ID
+  name         String
+  setName      String
+  imageUrl     String?
+  rarity       String?
+  marketPrice  Float          @default(0.0)
+  
+  Instances    CardInstance[]
+}
+
+model CardInstance {
+  id           String         @id @default(uuid())
+  ownerId      String
+  cardId       String
+  condition    Condition      @default(NEAR_MINT)
+  purchasePrice Float?
+  notes        String?
+  acquiredAt   DateTime       @default(now())
+
+  Owner        User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  Card         CardReference  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  Listings     MarketListing[]
+}
+
+model MarketListing {
+  id             String         @id @default(uuid())
+  sellerId       String
+  cardInstanceId String
+  price          Float
+  status         ListingStatus  @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+
+  Seller         User           @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  CardInstance   CardInstance   @relation(fields: [cardInstanceId], references: [id], onDelete: Cascade)
+  Deal           Deal?
+}
+
+model Deal {
+  id              String         @id @default(uuid())
+  buyerId         String
+  sellerId        String
+  marketListingId String         @unique
+  price           Float
+  status          DealStatus     @default(PENDING_PAYMENT)
+  createdAt       DateTime       @default(now())
+
+  Buyer           User           @relation("BuyerDeals", fields: [buyerId], references: [id])
+  Seller          User           @relation("SellerDeals", fields: [sellerId], references: [id])
+  Listing         MarketListing  @relation(fields: [marketListingId], references: [id])
+}
+
+model Post {
+  id        String   @id @default(uuid())
+  authorId  String
+  content   String
+  images    String[]
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  Author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum GameType {
+  POKEMON
+  MTG
+}
+
+enum Condition {
+  MINT
+  NEAR_MINT
+  LIGHTLY_PLAYED
+  MODERATELY_PLAYED
+  HEAVILY_PLAYED
+  DAMAGED
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD
+  CANCELLED
+}
+
+enum DealStatus {
+  PENDING_PAYMENT
+  PAID
+  SHIPPED
+  COMPLETED
+}
