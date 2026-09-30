@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { after } from "next/server";
 import { CATEGORY_IDS } from "./tcgcsv";
 
 const TCGCSV_BASE = "https://tcgcsv.com/tcgplayer";
@@ -203,6 +204,9 @@ export function getSyncProgress(): SyncProgress {
 /**
  * Kick off a background sync of every group in the given categories
  * (or only `groupIds` if provided). Returns immediately; poll getSyncProgress.
+ *
+ * Uses next/server `after()` so the work continues after the response is
+ * sent — required on Vercel serverless, harmless locally.
  */
 export function startFullSync(
   categoryIds: number[],
@@ -211,7 +215,7 @@ export function startFullSync(
   const p = progressRef();
   if (p.running) throw new Error("A catalog sync is already running");
 
-  (async () => {
+  const run = async () => {
     try {
       for (const categoryId of categoryIds) {
         await syncGroups(categoryId);
@@ -248,7 +252,14 @@ export function startFullSync(
       p.running = false;
       p.finishedAt = Date.now();
     }
-  })();
+  };
+
+  try {
+    after(run);
+  } catch {
+    // Called outside a request scope (e.g. local scripts) — run directly.
+    void run();
+  }
 
   return p;
 }

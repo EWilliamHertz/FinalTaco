@@ -201,8 +201,12 @@ function SearchPage() {
           ) : (
             <div className="py-20 text-center flex flex-col items-center justify-center opacity-50">
               <p className="font-serif text-2xl text-neutral-400 mb-2">No Results Found</p>
-              <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-6">
-                Try adjusting your search parameters{catalog && catalog.syncedGroups < catalog.groups ? ", or sync the full catalog below" : ""}.
+              <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-6 max-w-md leading-relaxed">
+                {catalog && catalog.cards === 0
+                  ? "The card catalog is empty — enter a set code (e.g. OTP, PAF, SWSH12) to pull that set from TCGplayer, or sync the full catalog above."
+                  : catalog && catalog.syncedGroups < catalog.groups
+                    ? "Only a few sets are ingested so far. Try a set code, or sync the full catalog above to search by name across everything."
+                    : "Try adjusting your search parameters."}
               </p>
               <Link href="/database" className="font-sans text-[10px] uppercase tracking-widest text-neutral-400 border-b border-white/20 pb-1">
                 Browse by set instead
