@@ -30,14 +30,35 @@ model User {
 model CardReference {
   id           String         @id @default(uuid())
   game         GameType
-  tcgcsvId     String         @unique // Map to TCGCSV API ID
+  tcgcsvId     String         @unique // TCGplayer productId from TCGCSV
+  groupId      Int? // TCGplayer groupId (set) this product belongs to
   name         String
+  cleanName    String?
   setName      String
+  setCode      String? // Group abbreviation, e.g. SWSH12, NEO
+  number       String? // Collector number, e.g. "139/195" or "7a"
   imageUrl     String?
   rarity       String?
+  subTypeName  String? // Normal / Holofoil / Reverse Holofoil
   marketPrice  Float          @default(0.0)
-  
+  lowPrice     Float?
+  highPrice    Float?
+
+  Group        CardGroup?     @relation(fields: [groupId], references: [groupId])
   Instances    CardInstance[]
+}
+
+model CardGroup {
+  groupId      Int            @id // TCGplayer groupId
+  categoryId   Int // 1 = MTG, 3 = Pokemon on TCGplayer
+  name         String
+  abbreviation String?
+  publishedOn  DateTime?
+  syncedAt     DateTime?
+
+  Cards        CardReference[]
+
+  @@index([categoryId, abbreviation])
 }
 
 model CardInstance {
@@ -52,6 +73,8 @@ model CardInstance {
   Owner        User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   Card         CardReference  @relation(fields: [cardId], references: [id], onDelete: Cascade)
   Listings     MarketListing[]
+
+  @@index([ownerId])
 }
 
 model MarketListing {

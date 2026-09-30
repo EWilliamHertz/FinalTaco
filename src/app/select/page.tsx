@@ -15,7 +15,7 @@ export default function Home() {
   };
 
   return (
-    <main className="relative w-full min-h-screen flex flex-col items-center justify-center bg-[#050505] py-24">
+    <main className="relative w-full min-h-screen flex flex-col items-center bg-[#050505] pt-16">
       {/* Background glow */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-[40vw] h-[40vw] bg-white/5 rounded-full blur-[100px] mix-blend-screen animate-pulse" />
@@ -25,7 +25,7 @@ export default function Home() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 text-center mb-16 w-full px-4 flex flex-col items-center"
+        className="relative z-10 text-center w-full px-4 flex flex-col items-center"
       >
         <div className="relative w-full max-w-[300px] h-[120px] md:h-[150px] mx-auto mb-2">
           <Image 
@@ -45,8 +45,23 @@ export default function Home() {
         </p>
       </motion.div>
 
-      {/* Cards */}
-      <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center justify-center w-full px-4">
+      {/* Both Paths Button */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="relative z-10 mt-10 text-center"
+      >
+        <button 
+          onClick={() => handleSelect("both")}
+          className="px-10 py-4 border border-white/20 text-neutral-400 hover:text-white hover:border-white hover:bg-white/5 transition-all duration-300 font-sans tracking-widest text-xs uppercase cursor-pointer backdrop-blur-sm focus:outline-none rounded-full"
+        >
+          I walk both paths
+        </button>
+      </motion.div>
+
+      {/* Cards — anchored so their bottom edge sits at the bottom of the viewport */}
+      <div className="relative z-10 mt-auto flex flex-col md:flex-row gap-8 items-center md:items-end justify-center w-full px-4">
         {/* Pokemon Option */}
         <button
           onClick={() => handleSelect("pokemon")}
@@ -90,20 +105,6 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Both Paths Button */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="relative z-10 mt-16 text-center"
-      >
-        <button 
-          onClick={() => handleSelect("both")}
-          className="px-10 py-4 border border-white/20 text-neutral-400 hover:text-white hover:border-white hover:bg-white/5 transition-all duration-300 font-sans tracking-widest text-xs uppercase cursor-pointer backdrop-blur-sm focus:outline-none rounded-full"
-        >
-          I walk both paths
-        </button>
-      </motion.div>
     </main>
   );
 }
