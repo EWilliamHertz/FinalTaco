@@ -2,14 +2,8 @@
 
 import { useSearchParams } from "next/navigation";
 import { useGameStore } from "@/lib/store";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
-import { Search } from "lucide-react";
-
-const CATEGORY_IDS = {
-  mtg: 1,
-  pokemon: 3,
-};
 
 function SearchPage() {
   const searchParams = useSearchParams();
@@ -23,89 +17,66 @@ function SearchPage() {
 
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     async function performSearch() {
       if (user) {
+        // User Search
         return;
       }
 
       if (!name && !set && !number) return;
       
-      if (!set) {
-        setErrorMsg("TCGCSV requires a Set Code (e.g. PAF or DLR) to search for products.");
-        return;
-      }
-      
       setLoading(true);
-      setErrorMsg("");
-      setResults([]);
-      
       try {
-        const catId = activeGame === "pokemon" ? CATEGORY_IDS.pokemon : CATEGORY_IDS.mtg;
-        
-        // 1. Fetch all groups for the category to find the matching abbreviation
-        const groupsRes = await fetch(`/api/tcgcsv/groups?categoryId=${catId}`);
-        const groupsData = await groupsRes.json();
-        
-        if (!groupsData.results) {
-          throw new Error("Failed to load TCGCSV groups.");
+        if (activeGame === "mtg") {
+          // Scryfall API
+          let query = "";
+          if (name) query += `${name} `; // Scryfall does fuzzy search natively without quotes
+          if (set) query += `set:${set} `;
+          if (number) query += `cn:${number} `;
+          
+          const res = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(query.trim())}`);
+          const data = await res.json();
+          if (data.data) {
+            setResults(data.data.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              setName: c.set_name,
+              image: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal,
+              number: c.collector_number
+            })));
+          }
+        } else if (activeGame === "pokemon") {
+          // Pokemon TCG API
+          let query = "";
+          if (name) {
+            // Pokémon API supports wildcards like name:charizard*
+            const safeName = name.replace(/[^a-zA-Z0-9 ]/g, ''); // strip special chars for safety
+            query += `name:${safeName.split(' ').join('* ')}* `; 
+          }
+          if (set) query += `set.id:${set}* `; 
+          if (number) query += `number:${number} `;
+          
+          const res = await fetch(`https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(query.trim())}`);
+          const data = await res.json();
+          if (data.data) {
+            setResults(data.data.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              setName: c.set.name,
+              image: c.images.small,
+              number: c.number
+            })));
+          }
         }
-        
-        const targetGroup = groupsData.results.find((g: any) => 
-          g.abbreviation?.toLowerCase() === set.toLowerCase() || 
-          g.name?.toLowerCase().includes(set.toLowerCase())
-        );
-        
-        if (!targetGroup) {
-          setErrorMsg(`Could not find a set matching "${set}" in TCGCSV.`);
-          setLoading(false);
-          return;
-        }
-
-        // 2. Fetch products for that specific group
-        const productsRes = await fetch(`/api/tcgcsv/products?categoryId=${catId}&groupId=${targetGroup.groupId}`);
-        const productsData = await productsRes.json();
-        
-        if (!productsData.results) {
-          throw new Error("Failed to load TCGCSV products.");
-        }
-        
-        // 3. Filter products locally based on name and number
-        let filtered = productsData.results;
-        
-        if (name) {
-          filtered = filtered.filter((p: any) => p.name?.toLowerCase().includes(name.toLowerCase()) || p.cleanName?.toLowerCase().includes(name.toLowerCase()));
-        }
-        
-        // We don't have collector number easily exposed on all TCGPlayer products, but we can check extendedData if needed.
-        // For now, if number is provided, we can try to filter by extendedData
-        if (number) {
-          filtered = filtered.filter((p: any) => {
-            const numData = p.extendedData?.find((ext: any) => ext.name === "Number");
-            return numData && numData.value === number;
-          });
-        }
-        
-        setResults(filtered.map((p: any) => ({
-          id: p.productId,
-          name: p.name,
-          setName: targetGroup.name,
-          image: p.imageUrl,
-          number: p.extendedData?.find((ext: any) => ext.name === "Number")?.value || ""
-        })));
-        
       } catch (err) {
         console.error(err);
-        setErrorMsg("An error occurred while fetching from TCGCSV.");
       }
       setLoading(false);
     }
     
-    if (activeGame) {
-      performSearch();
-    }
+    performSearch();
   }, [name, set, number, user, activeGame]);
 
   return (
@@ -127,28 +98,20 @@ function SearchPage() {
           </p>
         </div>
       ) : loading ? (
-        <div className="text-center text-neutral-500 font-serif italic py-12">Scouring the TCGCSV archives...</div>
-      ) : errorMsg ? (
-        <div className="py-20 text-center flex flex-col items-center justify-center opacity-80">
-          <Search size={48} className="text-neutral-600 mb-6" />
-          <p className="font-serif text-2xl text-white mb-2">TCGCSV Search Limitation</p>
-          <p className="font-sans text-[10px] uppercase tracking-widest text-rose-400 max-w-md mx-auto">
-            {errorMsg}
-          </p>
-        </div>
+        <div className="text-center text-neutral-500 font-serif italic py-12">Scouring the archives...</div>
       ) : results.length > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {results.map((card) => (
             <div key={card.id} className="group relative">
-              <div className="relative aspect-[63/88] rounded-xl overflow-hidden border border-white/10 group-hover:border-white/30 transition-colors mb-3 bg-neutral-900/50">
+              <div className="relative aspect-[63/88] rounded-xl overflow-hidden border border-white/10 group-hover:border-white/30 transition-colors mb-3">
                 {card.image ? (
-                  <Image src={card.image} alt={card.name} fill className="object-contain p-2" unoptimized />
+                  <Image src={card.image} alt={card.name} fill className="object-cover" unoptimized />
                 ) : (
                   <div className="w-full h-full bg-neutral-900 flex items-center justify-center text-neutral-500 font-serif text-xs">No Image</div>
                 )}
               </div>
               <h3 className="font-serif text-white text-sm truncate">{card.name}</h3>
-              <p className="font-sans text-[9px] uppercase tracking-widest text-neutral-500 truncate">{card.setName} {card.number && `• #${card.number}`}</p>
+              <p className="font-sans text-[9px] uppercase tracking-widest text-neutral-500 truncate">{card.setName} • #{card.number}</p>
             </div>
           ))}
         </div>
@@ -156,15 +119,13 @@ function SearchPage() {
         <div className="py-20 text-center flex flex-col items-center justify-center opacity-50">
           <p className="font-serif text-2xl text-neutral-400 mb-2">No Results Found</p>
           <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-500">
-            No matching cards found in that set.
+            Try adjusting your search parameters.
           </p>
         </div>
       )}
     </main>
   );
 }
-
-import { Suspense } from "react";
 
 export default function SearchPageWrapper() {
   return (

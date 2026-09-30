@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGameStore } from "@/lib/store";
 
 const links = [
@@ -28,6 +28,14 @@ export function Navigation() {
   const [searchSet, setSearchSet] = useState("");
   const [searchNumber, setSearchNumber] = useState("");
   const [searchUser, setSearchUser] = useState("");
+  
+  const [user, setUser] = useState<{username: string, avatarUrl: string | null} | null>(null);
+
+  useEffect(() => {
+    import("@/app/actions/auth").then(({ getCurrentUser }) => {
+      getCurrentUser().then(setUser);
+    });
+  }, [pathname]);
 
   if (!activeGame && (pathname === "/" || pathname === "/select")) return null;
 
@@ -79,7 +87,11 @@ export function Navigation() {
             onClick={() => setSidebarOpen(true)}
             className="h-8 w-8 rounded-full border border-white/10 bg-neutral-900 overflow-hidden flex items-center justify-center cursor-pointer hover:border-white/50 transition-colors"
           >
-            <span className="text-[10px] text-neutral-500 font-serif">USR</span>
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-[10px] text-neutral-500 font-serif">{user?.username ? user.username.slice(0,3).toUpperCase() : "USR"}</span>
+            )}
           </div>
         </div>
       </header>
@@ -198,11 +210,15 @@ export function Navigation() {
       >
         <div className="p-8 border-b border-white/5 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full border border-white/20 bg-neutral-900 flex items-center justify-center">
-              <span className="text-xs text-neutral-400 font-serif">USR</span>
+            <div className="h-12 w-12 rounded-full border border-white/20 bg-neutral-900 flex items-center justify-center overflow-hidden">
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs text-neutral-400 font-serif">{user?.username ? user.username.slice(0,3).toUpperCase() : "USR"}</span>
+              )}
             </div>
             <div>
-              <p className="font-serif text-lg text-white">Collector</p>
+              <p className="font-serif text-lg text-white">{user?.username || "Collector"}</p>
               <p className="font-sans text-[10px] uppercase tracking-widest text-emerald-500">Verified Vault</p>
             </div>
           </div>
