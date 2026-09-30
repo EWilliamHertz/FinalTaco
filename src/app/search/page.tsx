@@ -25,12 +25,18 @@ function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [added, setAdded] = useState<Record<string, boolean>>({});
-  const [catalog, setCatalog] = useState<{ groups: number; cards: number; syncedGroups: number; sync: { running: boolean; done: number; total: number; currentGroup: string | null } } | null>(null);
+  const [catalog, setCatalog] = useState<{ groups: number; cards: number; syncedGroups: number; groupsError?: string | null; sync: { running: boolean; done: number; total: number; currentGroup: string | null } } | null>(null);
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     if (user) return;
-    getCatalogStatus(activeGame ?? "both").then(setCatalog).catch(() => {});
+    getCatalogStatus(activeGame ?? "both")
+      .then(setCatalog)
+      .catch((err) => {
+        console.error("Catalog status failed:", err);
+        // Still show the banner so the sync button is reachable
+        setCatalog({ groups: 0, cards: 0, syncedGroups: 0, groupsError: "status unavailable", sync: { running: false, done: 0, total: 0, currentGroup: null } });
+      });
   }, [user, activeGame]);
 
   useEffect(() => {
@@ -137,10 +143,16 @@ function SearchPage() {
           {catalog && (
             <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-neutral-900/40 border border-white/5 rounded-xl px-6 py-4">
               <div className="font-sans text-[10px] uppercase tracking-widest text-neutral-400">
-                Catalog: <span className="text-white">{catalog.cards.toLocaleString()}</span> cards from{" "}
-                <span className="text-white">{catalog.syncedGroups}</span>/{catalog.groups} sets ({syncPct}%)
-                {setsSynced.length > 0 && (
-                  <span className={brandColor}> · just synced: {setsSynced.join(", ")}</span>
+                {catalog.groupsError && catalog.groups === 0 ? (
+                  <span className="text-rose-400">Catalog status unavailable (TCGCSV unreachable?)</span>
+                ) : (
+                  <>
+                    Catalog: <span className="text-white">{catalog.cards.toLocaleString()}</span> cards from{" "}
+                    <span className="text-white">{catalog.syncedGroups}</span>/{catalog.groups} sets ({syncPct}%)
+                    {setsSynced.length > 0 && (
+                      <span className={brandColor}> · just synced: {setsSynced.join(", ")}</span>
+                    )}
+                  </>
                 )}
               </div>
               <button

@@ -146,8 +146,14 @@ function categoryIdsForGame(game: "pokemon" | "mtg" | "both"): number[] {
 /** Ensure groups exist for the active game(s) and report catalog coverage. */
 export async function getCatalogStatus(game: "pokemon" | "mtg" | "both") {
   const categoryIds = categoryIdsForGame(game);
+  let groupsError: string | null = null;
   for (const id of categoryIds) {
-    await syncGroups(id);
+    try {
+      await syncGroups(id);
+    } catch (err: any) {
+      // Don't let a TCGCSV hiccup hide the whole status banner
+      groupsError = err?.message ?? "failed to reach TCGCSV";
+    }
   }
 
   const [groups, cards, syncedGroups] = await Promise.all([
@@ -160,7 +166,7 @@ export async function getCatalogStatus(game: "pokemon" | "mtg" | "both") {
     }),
   ]);
 
-  return { groups, cards, syncedGroups, sync: getSyncProgress(), categoryIds };
+  return { groups, cards, syncedGroups, sync: getSyncProgress(), categoryIds, groupsError };
 }
 
 /** Start a full catalog sync for the active game(s). */
