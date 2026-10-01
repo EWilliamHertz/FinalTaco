@@ -64,11 +64,24 @@ export async function createPost(formData: FormData) {
   }
 }
 
-export async function getPosts(skip = 0, take = 12) {
+export async function getPosts(skip = 0, take = 12, feedType: "GLOBAL" | "FOLLOWING" = "GLOBAL") {
   const user = await getCurrentUser();
   
   try {
+    let whereClause: any = {};
+    
+    if (feedType === "FOLLOWING" && user) {
+      const following = await prisma.follows.findMany({
+        where: { followerId: user.id },
+        select: { followingId: true }
+      });
+      const followingIds = following.map(f => f.followingId);
+      followingIds.push(user.id);
+      whereClause = { authorId: { in: followingIds } };
+    }
+
     const posts = await prisma.post.findMany({
+      where: whereClause,
       skip,
       take,
       orderBy: { createdAt: "desc" },

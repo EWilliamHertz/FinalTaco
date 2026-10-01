@@ -1,4 +1,5 @@
 import { getUserProfile } from "@/app/actions/user";
+import { getUserBadges } from "@/app/actions/gamification";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { Heart, MessageCircle } from "lucide-react";
@@ -10,6 +11,8 @@ import { prisma } from "@/lib/db";
 export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const resolvedParams = await params;
   const profile = await getUserProfile(resolvedParams.username);
+  const badgesRes = await getUserBadges(resolvedParams.username);
+  const badges = badgesRes.success ? badgesRes.badges : [];
   if (!profile) {
     return notFound();
   }
@@ -48,9 +51,23 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
         
         <div className="text-center md:text-left flex-1">
           <div className="flex items-center gap-4 mb-2"><h1 className="font-serif text-4xl text-white">{profile.username}</h1>{currentUserId && currentUserId !== profile.id && <FollowButton targetUserId={profile.id} initialFollowed={isFollowing} />}</div>
-          <p className="font-sans text-xs uppercase tracking-widest text-neutral-400 mb-6">
+          <p className="font-sans text-xs uppercase tracking-widest text-neutral-400 mb-4">
             Joined {new Date(profile.createdAt).toLocaleDateString()}
           </p>
+          {badges && badges.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-6">
+              {badges.map((b: any) => (
+                <div key={b.id} className="group relative flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <span className="text-[10px]">{b.icon || "🏆"}</span>
+                  <div className="absolute bottom-full mb-2 hidden group-hover:block w-max max-w-[200px] bg-black border border-white/10 rounded p-2 z-50">
+                    <p className="text-[10px] font-serif text-white mb-1">{b.name}</p>
+                    <p className="text-[8px] font-sans text-neutral-400">{b.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           
           <div className="flex items-center justify-center md:justify-start gap-8">
             <div className="flex flex-col items-center md:items-start">

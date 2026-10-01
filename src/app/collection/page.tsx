@@ -5,6 +5,7 @@ import { useGameStore } from "@/lib/store";
 import { motion } from "framer-motion";
 import { TrendingUp, Plus, Search, Check, X, Tag, DollarSign, Trash2 } from "lucide-react";
 import { getVault, removeFromVault } from "@/app/actions/vault";
+import { MultiSelect } from "@/components/MultiSelect";
 import { toast } from "react-toastify";
 import { markForSale, type ListingOverride } from "@/app/actions/market";
 import Image from "next/image";
@@ -44,9 +45,11 @@ export default function CollectionPage() {
   const router = useRouter();
   const [cards, setCards] = useState<VaultCard[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterGame, setFilterGame] = useState<"ALL" | "POKEMON" | "MTG">("ALL");
-  const [filterTag, setFilterTag] = useState("ALL");
-  const [sortBy, setSortBy] = useState<"NEWEST" | "PRICE_DESC" | "PRICE_ASC">("NEWEST");
+  const [filterGames, setFilterGames] = useState<Set<string>>(new Set());
+  const [filterConditions, setFilterConditions] = useState<Set<string>>(new Set());
+  const [filterVariants, setFilterVariants] = useState<Set<string>>(new Set());
+  
+  const [sortBy, setSortBy] = useState<"NEWEST" | "PRICE_DESC" | "PRICE_ASC" | "NAME_ASC" | "NAME_DESC">("NEWEST");
   const [viewMode, setViewMode] = useState<"cards" | "sealed">("cards");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
@@ -84,9 +87,72 @@ export default function CollectionPage() {
   const brandBorder = activeGame === "pokemon" ? "border-yellow-400" : activeGame === "mtg" ? "border-orange-500" : "border-emerald-400";
   const brandBg = activeGame === "pokemon" ? "bg-yellow-400" : activeGame === "mtg" ? "bg-orange-500" : "bg-emerald-400";
 
-  const displayedCards = activeGame === "both"
-    ? cards
-    : cards.filter((c) => c.Card.game.toLowerCase() === activeGame);
+  const getInstanceValue = (instance: any) => {
+    if (instance.customPrice && instance.customPrice > 0) return instance.customPrice;
+    const isReverse = instance.notes?.includes("Reverse Holo");
+    if (isReverse && instance.Card.reversePrice && instance.Card.reversePrice > 0) return instance.Card.reversePrice;
+    const isFoil = instance.notes?.includes("Foil");
+    if (isFoil && instance.Card.foilPrice && instance.Card.foilPrice > 0) return instance.Card.foilPrice;
+    return instance.Card.marketPrice || 0;
+  };
+
+  const displayedCards = useMemo(() => {
+    let filtered = activeGame === "both"
+      ? cards
+      : cards.filter((c) => c.Card.game.toLowerCase() === activeGame);
+      
+    if (filterGames.size > 0) {
+      filtered = filtered.filter(c => filterGames.has(c.Card.game.toUpperCase()));
+    }
+    
+    if (filterConditions.size > 0) {
+      filtered = filtered.filter(c => c.condition && filterConditions.has(c.condition));
+    }
+    if (filterVariants.size > 0) {
+      filtered = filtered.filter(c => {
+        if (!c.notes) return false;
+        const notesArr = c.notes.split(",").map(n => n.trim());
+        return Array.from(filterVariants).some(v => notesArr.includes(v));
+      });
+    }
+
+    if (sortBy === "PRICE_ASC") {
+      filtered.sort((a, b) => getInstanceValue(a) - getInstanceValue(b));
+    } else if (sortBy === "PRICE_DESC") {
+      filtered.sort((a, b) => getInstanceValue(b) - getInstanceValue(a));
+    } else if (sortBy === "NAME_ASC") {
+      filtered.sort((a, b) => a.Card.name.localeCompare(b.Card.name));
+    } else if (sortBy === "NAME_DESC") {
+      filtered.sort((a, b) => b.Card.name.localeCompare(a.Card.name));
+    } else if (sortBy === "NEWEST") {
+      // Assuming original order is newest, or we could leave it
+    }
+
+    return filtered;
+  }, [cards, activeGame, filterGames, filterConditions, filterVariants, sortBy]);
+
+  const uniqueGames = useMemo(() => Array.from(new Set(cards.map(c => c.Card.game.toUpperCase()))).filter(Boolean), [cards]);
+  const uniqueConditions = useMemo(() => {
+    const conditions = new Set<string>();
+    cards.forEach(instance => {
+      if (instance.condition) conditions.add(instance.condition);
+    });
+    return Array.from(conditions).sort();
+  }, [cards]);
+
+  const uniqueVariants = useMemo(() => {
+    const variants = new Set<string>();
+    cards.forEach(instance => {
+      if (instance.notes) {
+        instance.notes.split(",").forEach((note) => {
+          const t = note.trim();
+          if (t) variants.add(t);
+        });
+      }
+    });
+    return Array.from(variants).sort();
+  }, [cards]);
+
 
   const groupedCards = useMemo(() => {
     const groups = new Map<string, typeof displayedCards>();
@@ -99,14 +165,7 @@ export default function CollectionPage() {
     return Array.from(groups.values());
   }, [displayedCards]);
 
-  const getInstanceValue = (instance: any) => {
-    if (instance.customPrice && instance.customPrice > 0) return instance.customPrice;
-    const isReverse = instance.notes?.includes("Reverse Holo");
-    if (isReverse && instance.Card.reversePrice && instance.Card.reversePrice > 0) return instance.Card.reversePrice;
-    const isFoil = instance.notes?.includes("Foil");
-    if (isFoil && instance.Card.foilPrice && instance.Card.foilPrice > 0) return instance.Card.foilPrice;
-    return instance.Card.marketPrice || 0;
-  };
+  
 
   const totalValue = displayedCards.reduce((acc, curr) => acc + getInstanceValue(curr), 0);
   const selectedValue = displayedCards
@@ -236,6 +295,53 @@ export default function CollectionPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Collection Grid */}
         <div className="lg:col-span-3">
+          
+            {cards.length > 0 && (
+              <div className="flex flex-wrap gap-4 mb-6">
+                {cards.length > 1 && (
+                  <select 
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white font-sans text-[10px] uppercase tracking-widest focus:outline-none focus:border-white/30"
+                  >
+                    <option value="NEWEST">Sort: Newest</option>
+                    <option value="PRICE_DESC">Price: High to Low</option>
+                    <option value="PRICE_ASC">Price: Low to High</option>
+                    <option value="NAME_ASC">Name: A to Z</option>
+                    <option value="NAME_DESC">Name: Z to A</option>
+                  </select>
+                )}
+
+                {uniqueGames.length > 1 && activeGame === "both" && (
+                  <MultiSelect 
+                    options={uniqueGames}
+                    selected={filterGames}
+                    onChange={setFilterGames}
+                    placeholder="All Games"
+                    formatOption={(g) => g === 'MTG' ? 'Magic: The Gathering' : g === 'POKEMON' ? 'Pokémon' : g}
+                  />
+                )}
+
+                {uniqueConditions.length > 1 && (
+                  <MultiSelect 
+                    options={uniqueConditions}
+                    selected={filterConditions}
+                    onChange={setFilterConditions}
+                    placeholder="All Conditions"
+                    formatOption={(c) => c.replace(/_/g, ' ')}
+                  />
+                )}
+                {uniqueVariants.length > 1 && (
+                  <MultiSelect 
+                    options={uniqueVariants}
+                    selected={filterVariants}
+                    onChange={setFilterVariants}
+                    placeholder="All Variants"
+                  />
+                )}
+              </div>
+            )}
+
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4 border border-white/10 p-1 rounded-lg bg-neutral-900/50">
               <button

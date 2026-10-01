@@ -8,36 +8,44 @@ datasource db {
 }
 
 model User {
-  id                String         @id @default(uuid())
-  email             String         @unique
-  username          String         @unique
+  id                String   @id @default(uuid())
+  email             String   @unique
+  username          String   @unique
   password          String
-  role              Role           @default(USER)
-  verified          Boolean        @default(false)
+  role              Role     @default(USER)
+  verified          Boolean  @default(false)
   verificationToken String?
   avatarUrl         String?
-  reputationScore   Float          @default(0.0)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  reputationScore   Float    @default(0.0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  CardInstances     CardInstance[]
-  MarketListings    MarketListing[]
-  Posts             Post[]
-  Purchases         Deal[]         @relation("BuyerDeals")
-  Sales             Deal[]         @relation("SellerDeals")
-  PostLikes         PostLike[]
-  Comments          Comment[]
-  Followers         Follows[] @relation("Following")
-  Following         Follows[] @relation("Followers")
-  SentMessages      Message[] @relation("SentMessages")
-  ReceivedMessages  Message[] @relation("ReceivedMessages")
-  Notifications     Notification[]
+  CardInstances    CardInstance[]
+  MarketListings   MarketListing[]
+  Posts            Post[]
+  Purchases        Deal[]          @relation("BuyerDeals")
+  Sales            Deal[]          @relation("SellerDeals")
+  PostLikes        PostLike[]
+  Comments         Comment[]
+  Followers        Follows[]       @relation("Following")
+  Following        Follows[]       @relation("Followers")
+  SentMessages     Message[]       @relation("SentMessages")
+  ReceivedMessages Message[]       @relation("ReceivedMessages")
+  Notifications    Notification[]
+
+  SentTrades       Trade[]             @relation("SentTrades")
+  ReceivedTrades   Trade[]             @relation("ReceivedTrades")
+  WishlistItems    Wishlist[]
+  PortfolioHistory PortfolioSnapshot[]
+  CreatedGroups    CommunityGroup[]    @relation("GroupCreator")
+  GroupMemberships GroupMember[]
+  Badges           UserBadge[]
 }
 
 model CardReference {
-  id           String         @id @default(uuid())
+  id           String   @id @default(uuid())
   game         GameType
-  tcgcsvId     String         @unique // TCGplayer productId from TCGCSV
+  tcgcsvId     String   @unique // TCGplayer productId from TCGCSV
   groupId      Int? // TCGplayer groupId (set) this product belongs to
   name         String
   cleanName    String?
@@ -47,71 +55,73 @@ model CardReference {
   imageUrl     String?
   rarity       String?
   subTypeName  String? // Normal / Holofoil / Reverse Holofoil
-  marketPrice  Float          @default(0.0)
+  marketPrice  Float    @default(0.0)
   foilPrice    Float?
   reversePrice Float?
   lowPrice     Float?
   highPrice    Float?
 
-  Group        CardGroup?     @relation(fields: [groupId], references: [groupId])
-  Instances    CardInstance[]
+  Group     CardGroup?     @relation(fields: [groupId], references: [groupId])
+  Instances CardInstance[]
+  Wishlist  Wishlist[]
 }
 
 model CardGroup {
-  groupId      Int            @id // TCGplayer groupId
+  groupId      Int       @id // TCGplayer groupId
   categoryId   Int // 1 = MTG, 3 = Pokemon on TCGplayer
   name         String
   abbreviation String?
   publishedOn  DateTime?
   syncedAt     DateTime?
 
-  Cards        CardReference[]
+  Cards CardReference[]
 
   @@index([categoryId, abbreviation])
 }
 
 model CardInstance {
-  id           String         @id @default(uuid())
-  ownerId      String
-  cardId       String
-  condition    Condition      @default(NEAR_MINT)
+  id            String    @id @default(uuid())
+  ownerId       String
+  cardId        String
+  condition     Condition @default(NEAR_MINT)
   purchasePrice Float?
   customPrice   Float?
-  notes        String?
-  acquiredAt   DateTime       @default(now())
+  notes         String?
+  acquiredAt    DateTime  @default(now())
 
-  Owner        User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  Card         CardReference  @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  Listings     MarketListing[]
+  Owner      User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  Card       CardReference   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  Listings   MarketListing[]
+  TradeItems TradeItem[]
 
   @@index([ownerId])
 }
 
 model MarketListing {
-  id             String         @id @default(uuid())
+  id             String        @id @default(uuid())
   sellerId       String
   cardInstanceId String
   price          Float
-  status         ListingStatus  @default(ACTIVE)
-  createdAt      DateTime       @default(now())
+  status         ListingStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now())
 
-  Seller         User           @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  CardInstance   CardInstance   @relation(fields: [cardInstanceId], references: [id], onDelete: Cascade)
-  Deal           Deal?
+  Seller       User         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  CardInstance CardInstance @relation(fields: [cardInstanceId], references: [id], onDelete: Cascade)
+  Deal         Deal?
 }
 
 model Deal {
-  id              String         @id @default(uuid())
+  id              String     @id @default(uuid())
   buyerId         String
   sellerId        String
-  marketListingId String         @unique
+  marketListingId String     @unique
   price           Float
-  status          DealStatus     @default(PENDING_PAYMENT)
-  createdAt       DateTime       @default(now())
+  status          DealStatus @default(PENDING_PAYMENT)
+  createdAt       DateTime   @default(now())
 
-  Buyer           User           @relation("BuyerDeals", fields: [buyerId], references: [id])
-  Seller          User           @relation("SellerDeals", fields: [sellerId], references: [id])
-  Listing         MarketListing  @relation(fields: [marketListingId], references: [id])
+  Buyer   User          @relation("BuyerDeals", fields: [buyerId], references: [id])
+  Seller  User          @relation("SellerDeals", fields: [sellerId], references: [id])
+  Listing MarketListing @relation(fields: [marketListingId], references: [id])
 }
 
 model Post {
@@ -165,8 +175,8 @@ model PostLike {
   userId    String
   createdAt DateTime @default(now())
 
-  Post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  User User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
 }
@@ -178,10 +188,9 @@ model Comment {
   content   String
   createdAt DateTime @default(now())
 
-  Post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  Author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  Post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  Author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
 }
-
 
 model Follows {
   followerId  String
@@ -204,18 +213,123 @@ model Message {
 
   Sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   Receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
-  
+
   @@index([senderId, receiverId])
 }
 
 model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String // e.g. "LIKE", "COMMENT", "FOLLOW", "TRADE"
+  content   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  User User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Trade {
+  id         String      @id @default(uuid())
+  senderId   String
+  receiverId String
+  status     TradeStatus @default(PENDING)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  Sender         User        @relation("SentTrades", fields: [senderId], references: [id])
+  Receiver       User        @relation("ReceivedTrades", fields: [receiverId], references: [id])
+  OfferedItems   TradeItem[] @relation("OfferedItems")
+  RequestedItems TradeItem[] @relation("RequestedItems")
+}
+
+model TradeItem {
+  id             String  @id @default(uuid())
+  tradeId        String
+  cardInstanceId String
+  isOffered      Boolean // true if offered by sender, false if requested from receiver
+
+  Trade          Trade        @relation("OfferedItems", fields: [tradeId], references: [id], map: "TradeItem_offered_fkey")
+  RequestedTrade Trade?       @relation("RequestedItems", fields: [tradeId], references: [id], map: "TradeItem_requested_fkey")
+  Instance       CardInstance @relation(fields: [cardInstanceId], references: [id])
+}
+
+enum TradeStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  cardId    String
+  createdAt DateTime @default(now())
+
+  User User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Card CardReference @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId])
+}
+
+model PortfolioSnapshot {
   id         String   @id @default(uuid())
   userId     String
-  type       String   // e.g. "LIKE", "COMMENT", "FOLLOW", "TRADE"
-  content    String
-  link       String?
-  read       Boolean  @default(false)
+  totalValue Float
+  cardCount  Int
   createdAt  DateTime @default(now())
 
-  User       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CommunityGroup {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  creatorId   String
+  createdAt   DateTime @default(now())
+
+  Creator User          @relation("GroupCreator", fields: [creatorId], references: [id])
+  Members GroupMember[]
+}
+
+model GroupMember {
+  id       String    @id @default(uuid())
+  groupId  String
+  userId   String
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+
+  Group CommunityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  User  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+}
+
+enum GroupRole {
+  MEMBER
+  ADMIN
+}
+
+model Badge {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  icon        String?
+  createdAt   DateTime @default(now())
+
+  UserBadges UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(uuid())
+  userId    String
+  badgeId   String
+  awardedAt DateTime @default(now())
+
+  User  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
 }

@@ -3,13 +3,15 @@ import { toast } from "react-toastify";
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useGameStore } from "@/lib/store";
-import { useEffect, useState, Suspense } from "react";
+import {  useEffect, useState, Suspense , useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { searchCatalog, type CatalogCard } from "@/app/actions/search";
 import { proxiedImage } from "@/lib/images";
 import { addToVault } from "@/app/actions/vault";
+import { toggleWishlist } from "@/app/actions/wishlist";
+import { MultiSelect } from "@/components/MultiSelect";
 
 function SearchPage() {
   const searchParams = useSearchParams();
@@ -42,6 +44,30 @@ function SearchPage() {
   const [customPrice, setCustomPrice] = useState("");
   const [isSubmittingVault, setIsSubmittingVault] = useState(false);
   const [added, setAdded] = useState<Record<string, boolean>>({});
+
+  const [filterGames, setFilterGames] = useState<Set<string>>(new Set());
+  const [filterSets, setFilterSets] = useState<Set<string>>(new Set());
+  const [filterRarities, setFilterRarities] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<string>("RELEVANCE");
+
+  const processedResults = useMemo(() => {
+    let res = [...results];
+    if (filterGames.size > 0) res = res.filter(r => (r as any).game && filterGames.has((r as any).game.toUpperCase()));
+    if (filterSets.size > 0) res = res.filter(r => filterSets.has(r.setName));
+    if (filterRarities.size > 0) res = res.filter(r => r.rarity && filterRarities.has(r.rarity));
+
+    if (sortBy === "PRICE_ASC") res.sort((a, b) => (a.marketPrice || 0) - (b.marketPrice || 0));
+    else if (sortBy === "PRICE_DESC") res.sort((a, b) => (b.marketPrice || 0) - (a.marketPrice || 0));
+    else if (sortBy === "NAME_ASC") res.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sortBy === "NAME_DESC") res.sort((a, b) => b.name.localeCompare(a.name));
+    
+    return res;
+  }, [results, filterGames, filterSets, filterRarities, sortBy]);
+
+  const uniqueGames = useMemo(() => Array.from(new Set(results.map(r => (r as any).game?.toUpperCase() || ""))).filter(Boolean), [results]);
+  const uniqueSets = useMemo(() => Array.from(new Set(results.map(r => r.setName))).filter(Boolean).sort(), [results]);
+  const uniqueRarities = useMemo(() => Array.from(new Set(results.map(r => r.rarity))).filter((r): r is string => Boolean(r)).sort(), [results]);
+
 
   // Keep the inline form in sync when the URL changes
   useEffect(() => {
@@ -91,6 +117,17 @@ function SearchPage() {
     setIsReverse(false);
     setIsSigned(false);
     setCustomPrice("");
+  };
+
+  
+  const handleWishlistToggle = async (e: React.MouseEvent, cardId: string) => {
+    e.stopPropagation();
+    const res = await toggleWishlist(cardId);
+    if (res.success) {
+      toast.success(res.added ? "Added to Wishlist" : "Removed from Wishlist");
+    } else {
+      toast.error(res.error || "Failed to update wishlist");
+    }
   };
 
   const handleConfirmAdd = async () => {
@@ -195,17 +232,77 @@ function SearchPage() {
             </div>
           </form>
 
+          
           {loading ? (
             <div className="text-center text-neutral-500 font-serif italic py-12">Scouring the archives...</div>
           ) : results.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {results.map((card) => (
+            <>
+              {results.length > 1 && (
+                <div className="flex flex-wrap gap-4 mb-6">
+                  <select 
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white font-sans text-[10px] uppercase tracking-widest focus:outline-none focus:border-white/30"
+                  >
+                    <option value="RELEVANCE">Sort: Relevance</option>
+                    <option value="PRICE_DESC">Price: High to Low</option>
+                    <option value="PRICE_ASC">Price: Low to High</option>
+                    <option value="NAME_ASC">Name: A to Z</option>
+                    <option value="NAME_DESC">Name: Z to A</option>
+                  </select>
+                  
+                  {uniqueGames.length > 1 && (
+                    <MultiSelect 
+                      options={uniqueGames}
+                      selected={filterGames}
+                      onChange={setFilterGames}
+                      placeholder="All Games"
+                      formatOption={(g) => g === 'MTG' ? 'Magic: The Gathering' : g === 'POKEMON' ? 'Pokémon' : g}
+                    />
+                  )}
+
+                  {uniqueSets.length > 1 && (
+                    <MultiSelect 
+                      options={uniqueSets}
+                      selected={filterSets}
+                      onChange={setFilterSets}
+                      placeholder="All Sets"
+                    />
+                  )}
+
+                  {uniqueRarities.length > 1 && (
+                    <MultiSelect 
+                      options={uniqueRarities}
+                      selected={filterRarities}
+                      onChange={setFilterRarities}
+                      placeholder="All Rarities"
+                    />
+                  )}
+                </div>
+              )}
+              {processedResults.length === 0 ? (
+                <div className="py-20 text-center text-neutral-500 font-serif italic border border-white/5 rounded-xl bg-neutral-900/30">
+                  No results match the selected filters.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {processedResults.map((card) => (
+
                 <div 
                   key={card.tcgcsvId} 
                   className="group relative cursor-pointer"
                   onClick={() => openAddModal(card)}
                 >
                   <div className="relative aspect-[63/88] rounded-xl overflow-hidden border border-white/10 group-hover:border-white/30 transition-colors mb-3">
+                  <div className="absolute top-2 left-2 z-10">
+                    <button 
+                      onClick={(e) => handleWishlistToggle(e, card.tcgcsvId)}
+                      className="p-1.5 bg-black/80 hover:bg-black text-neutral-400 hover:text-pink-500 rounded-full transition-colors backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                    </button>
+                  </div>
+
                     {card.imageUrl ? (
                       <Image src={proxiedImage(card.imageUrl)!} alt={card.name} fill className="object-cover" unoptimized />
                     ) : (
@@ -223,7 +320,9 @@ function SearchPage() {
                   </p>
                 </div>
               ))}
-            </div>
+                            </div>
+              )}
+            </>
           ) : (
             <div className="py-20 text-center flex flex-col items-center justify-center opacity-50">
               <p className="font-serif text-2xl text-neutral-400 mb-2">No Results Found</p>

@@ -4,47 +4,92 @@ import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { getUserVault } from "@/app/actions/user";
 import { proxiedImage } from "@/lib/images";
+import { MultiSelect } from "@/components/MultiSelect";
 
 export default function ProfileVaultClient({ username }: { username: string }) {
   const [vault, setVault] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeGame, setActiveGame] = useState<"ALL" | "POKEMON" | "MTG">("ALL");
-  const [activeTag, setActiveTag] = useState<string>("ALL");
+  const [activeGames, setActiveGames] = useState<Set<string>>(new Set());
+  const [filterConditions, setFilterConditions] = useState<Set<string>>(new Set());
+  const [filterVariants, setFilterVariants] = useState<Set<string>>(new Set());
+  
+  const [sortBy, setSortBy] = useState<"NEWEST" | "PRICE_DESC" | "PRICE_ASC" | "NAME_ASC" | "NAME_DESC">("NEWEST");
 
   useEffect(() => {
     setLoading(true);
-    getUserVault(username, activeGame === "ALL" ? undefined : activeGame).then(data => {
+    getUserVault(username, undefined).then(data => {
       setVault(data);
       setLoading(false);
     });
-  }, [username, activeGame]);
+  }, [username]);
 
   // Extract unique tags/notes for the filter
-  const uniqueTags = useMemo(() => {
-    const tags = new Set<string>();
+  const uniqueConditions = useMemo(() => {
+    const conditions = new Set<string>();
+    vault.forEach(instance => {
+      if (instance.condition) conditions.add(instance.condition);
+    });
+    return Array.from(conditions).sort();
+  }, [vault]);
+
+  const uniqueVariants = useMemo(() => {
+    const variants = new Set<string>();
     vault.forEach(instance => {
       if (instance.notes) {
         instance.notes.split(",").forEach((note: string) => {
           const t = note.trim();
-          if (t) tags.add(t);
+          if (t) variants.add(t);
         });
       }
-      if (instance.condition) {
-        tags.add(instance.condition);
-      }
     });
-    return Array.from(tags).sort();
+    return Array.from(variants).sort();
   }, [vault]);
 
+  const uniqueGames = useMemo(() => Array.from(new Set(vault.map((c: any) => c.Card?.game?.toUpperCase()))).filter(Boolean), [vault]);
+
   const filteredVault = useMemo(() => {
-    if (activeTag === "ALL") return vault;
-    return vault.filter(instance => {
-      const notes = instance.notes ? instance.notes.toLowerCase() : "";
-      const cond = instance.condition ? instance.condition.toLowerCase() : "";
-      const tagLower = activeTag.toLowerCase();
-      return notes.includes(tagLower) || cond === tagLower;
-    });
-  }, [vault, activeTag]);
+    let filtered = [...vault];
+    if (activeGames.size > 0) {
+      filtered = filtered.filter(c => activeGames.has(c.Card.game.toUpperCase()));
+    }
+    if (filterConditions.size > 0) {
+      filtered = filtered.filter(c => c.condition && filterConditions.has(c.condition));
+    }
+    if (filterVariants.size > 0) {
+      filtered = filtered.filter(c => {
+        if (!c.notes) return false;
+        const notesArr = c.notes.split(",").map((n: string) => n.trim());
+        return Array.from(filterVariants).some(v => notesArr.includes(v));
+      });
+    }
+    return filtered;
+  }, [vault, activeGames, filterConditions, filterVariants]);
+
+  
+  const sortedAndFilteredVault = useMemo(() => {
+    let res = [...filteredVault];
+    
+    const getValue = (instance: any) => {
+      if (instance.customPrice && instance.customPrice > 0) return instance.customPrice;
+      const isReverse = instance.notes?.includes("Reverse Holo");
+      if (isReverse && instance.Card.reversePrice && instance.Card.reversePrice > 0) return instance.Card.reversePrice;
+      const isFoil = instance.notes?.includes("Foil");
+      if (isFoil && instance.Card.foilPrice && instance.Card.foilPrice > 0) return instance.Card.foilPrice;
+      return instance.Card.marketPrice || 0;
+    };
+
+    if (sortBy === "PRICE_ASC") {
+      res.sort((a, b) => getValue(a) - getValue(b));
+    } else if (sortBy === "PRICE_DESC") {
+      res.sort((a, b) => getValue(b) - getValue(a));
+    } else if (sortBy === "NAME_ASC") {
+      res.sort((a, b) => a.Card.name.localeCompare(b.Card.name));
+    } else if (sortBy === "NAME_DESC") {
+      res.sort((a, b) => b.Card.name.localeCompare(a.Card.name));
+    }
+    
+    return res;
+  }, [filteredVault, sortBy]);
 
   return (
     <div className="mt-16 border-t border-white/10 pt-16">
@@ -54,27 +99,49 @@ export default function ProfileVaultClient({ username }: { username: string }) {
         </h2>
 
         <div className="flex flex-col sm:flex-row gap-4">
-          <select 
-            value={activeGame}
-            onChange={(e) => setActiveGame(e.target.value as any)}
-            className="bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white font-sans text-[10px] uppercase tracking-widest focus:outline-none focus:border-white/30"
-          >
-            <option value="ALL">All Games</option>
-            <option value="MTG">Magic: The Gathering</option>
-            <option value="POKEMON">Pokémon</option>
-          </select>
 
-          {uniqueTags.length > 0 && (
+          {vault.length > 1 && (
             <select 
-              value={activeTag}
-              onChange={(e) => setActiveTag(e.target.value)}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
               className="bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white font-sans text-[10px] uppercase tracking-widest focus:outline-none focus:border-white/30"
             >
-              <option value="ALL">All Variants & Conditions</option>
-              {uniqueTags.map(tag => (
-                <option key={tag} value={tag}>{tag}</option>
-              ))}
+              <option value="NEWEST">Sort: Newest</option>
+              <option value="PRICE_DESC">Price: High to Low</option>
+              <option value="PRICE_ASC">Price: Low to High</option>
+              <option value="NAME_ASC">Name: A to Z</option>
+              <option value="NAME_DESC">Name: Z to A</option>
             </select>
+          )}
+
+          
+          {uniqueGames.length > 1 && (
+            <MultiSelect 
+              options={uniqueGames}
+              selected={activeGames}
+              onChange={setActiveGames}
+              placeholder="All Games"
+              formatOption={(g) => g === 'MTG' ? 'Magic: The Gathering' : g === 'POKEMON' ? 'Pokémon' : g}
+            />
+          )}
+
+
+          {uniqueConditions.length > 1 && (
+            <MultiSelect 
+              options={uniqueConditions}
+              selected={filterConditions}
+              onChange={setFilterConditions}
+              placeholder="All Conditions"
+              formatOption={(c) => c.replace(/_/g, ' ')}
+            />
+          )}
+          {uniqueVariants.length > 1 && (
+            <MultiSelect 
+              options={uniqueVariants}
+              selected={filterVariants}
+              onChange={setFilterVariants}
+              placeholder="All Variants"
+            />
           )}
         </div>
       </div>
@@ -87,13 +154,13 @@ export default function ProfileVaultClient({ username }: { username: string }) {
         <div className="py-12 text-center text-neutral-500 font-serif italic border border-white/5 rounded-xl bg-neutral-900/30">
           No cards found in this vault.
         </div>
-      ) : filteredVault.length === 0 ? (
+      ) : sortedAndFilteredVault.length === 0 ? (
         <div className="py-12 text-center text-neutral-500 font-serif italic border border-white/5 rounded-xl bg-neutral-900/30">
           No cards match the selected filter.
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {filteredVault.map((instance) => (
+          {sortedAndFilteredVault.map((instance) => (
             <div key={instance.id} className="group relative">
               <div className="relative aspect-[63/88] rounded-xl overflow-hidden border border-white/10 mb-3">
                 {instance.Card.imageUrl ? (

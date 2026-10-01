@@ -23,6 +23,7 @@ export default function FeedPage() {
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [feedType, setFeedType] = useState<"GLOBAL" | "FOLLOWING">("GLOBAL");
   
   const TAKE = 12;
 
@@ -38,7 +39,7 @@ export default function FeedPage() {
     setLoading(true);
     const user = await getCurrentUser();
     setCurrentUser(user);
-    const initialPosts = await getPosts(0, TAKE);
+    const initialPosts = await getPosts(0, TAKE, feedType);
     setPosts(initialPosts);
     setHasMore(initialPosts.length === TAKE);
     setSkip(TAKE);
@@ -47,12 +48,12 @@ export default function FeedPage() {
 
   useEffect(() => {
     fetchInitial();
-  }, [fetchInitial]);
+  }, [fetchInitial, feedType]);
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
-    const morePosts = await getPosts(skip, TAKE);
+    const morePosts = await getPosts(skip, TAKE, feedType);
     if (morePosts.length > 0) {
       setPosts(prev => [...prev, ...morePosts]);
       setSkip(prev => prev + TAKE);
@@ -91,6 +92,24 @@ export default function FeedPage() {
         </p>
       </div>
 
+      
+      <div className="flex justify-center mb-12">
+        <div className="bg-neutral-900/50 border border-white/10 rounded-full p-1 flex">
+          <button 
+            onClick={() => { setFeedType("GLOBAL"); setSkip(0); }}
+            className={`px-6 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest transition-colors ${feedType === "GLOBAL" ? "bg-white text-black" : "text-neutral-500 hover:text-white"}`}
+          >
+            Global Feed
+          </button>
+          <button 
+            onClick={() => { setFeedType("FOLLOWING"); setSkip(0); }}
+            className={`px-6 py-2 rounded-full font-sans text-[10px] uppercase tracking-widest transition-colors ${feedType === "FOLLOWING" ? "bg-white text-black" : "text-neutral-500 hover:text-white"}`}
+          >
+            Following
+          </button>
+        </div>
+      </div>
+
       <div className="max-w-2xl mx-auto mb-16">
         <form ref={formRef} action={handlePost} className="bg-neutral-900/50 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
           <textarea 
@@ -118,8 +137,7 @@ export default function FeedPage() {
                   className="hidden" 
                 />
               </label>
-              <input type="text" name="image" placeholder="Or paste URL..." className="bg-black/50 border border-white/10 rounded-lg px-3 text-xs text-white focus:outline-none font-sans w-24 sm:w-48" />
-            </div>
+              </div>
             <button 
               type="submit" 
               disabled={isPosting}
@@ -131,7 +149,7 @@ export default function FeedPage() {
         </form>
       </div>
 
-      <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {loading ? (
           <div className="col-span-full py-20 text-center font-serif text-neutral-500 italic">Loading feed...</div>
         ) : posts.length === 0 ? (
@@ -146,7 +164,7 @@ export default function FeedPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: (i % TAKE) * 0.1, duration: 0.8, ease: "easeOut" }}
-              className={`break-inside-avoid relative group rounded-2xl overflow-hidden bg-neutral-900/50 border border-white/5 ${hoverBorder} transition-colors duration-500 backdrop-blur-sm flex flex-col`}
+              className={`relative group rounded-2xl overflow-hidden bg-neutral-900/50 border border-white/5 ${hoverBorder} transition-colors duration-500 backdrop-blur-sm flex flex-col`}
             >
 
               {currentUser && (currentUser.id === post.authorId || currentUser.role === "ADMIN") && (
