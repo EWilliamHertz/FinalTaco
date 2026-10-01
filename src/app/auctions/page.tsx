@@ -57,13 +57,13 @@ export default function AuctionsPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-white">Active Auctions</h1>
+        <h1 className="font-serif text-4xl text-white font-light uppercase tracking-widest">Auctions</h1>
         <button
           onClick={() => {
             setShowCreate(true);
             loadMyCards();
           }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+          className="px-6 py-2 bg-white text-black hover:bg-neutral-200 transition-colors rounded-lg font-sans text-xs uppercase tracking-widest"
         >
           Start Auction
         </button>

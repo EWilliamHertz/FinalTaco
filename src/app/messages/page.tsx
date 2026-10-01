@@ -2,6 +2,7 @@ import { getConversations } from "@/app/actions/message";
 import { getCurrentUser } from "@/app/actions/auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { NewMessageClient } from "./NewMessageClient";
 
 export default async function MessagesDashboard() {
   const user = await getCurrentUser();
@@ -17,10 +18,10 @@ export default async function MessagesDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 min-h-[calc(100vh-64px)]">
-      <h1 className="text-3xl font-bold mb-8 text-white">Messages</h1>
+      <div className="flex justify-between items-end mb-8"><h1 className="font-serif text-4xl text-white font-light uppercase tracking-widest">Messages</h1><NewMessageClient /></div>
       
       {(!conversations || conversations.length === 0) ? (
-        <div className="text-gray-400">No conversations yet.</div>
+        <div className="py-20 text-center opacity-50"><p className="font-serif text-2xl text-neutral-400 mb-2">No Conversations</p><p className="font-sans text-xs uppercase tracking-widest text-neutral-500 mb-6">Start chatting with other collectors.</p><NewMessageClient /></div>
       ) : (
         <div className="space-y-4">
           {conversations.map((conv) => (
