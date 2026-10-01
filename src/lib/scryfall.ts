@@ -6,7 +6,7 @@ export async function searchScryfall(query: string, set?: string, number?: strin
   
   if (q.length === 0) return [];
 
-  const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q.join(" "))}`;
+  const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q.join(" "))}&unique=prints`;
   try {
     const res = await fetch(url, { headers: { 'User-Agent': 'hatake-social/1.0' } });
     if (!res.ok) {

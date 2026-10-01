@@ -58,6 +58,12 @@ export default function CollectionPage() {
   const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Import Modal State
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importStats, setImportStats] = useState({ cards: 0, rows: 0, uniqueScryfallIds: 0 });
+  const [importing, setImporting] = useState(false);
+
   useEffect(() => {
     if (!activeGame) {
       router.push("/");
@@ -81,6 +87,17 @@ export default function CollectionPage() {
   const displayedCards = activeGame === "both"
     ? cards
     : cards.filter((c) => c.Card.game.toLowerCase() === activeGame);
+
+  const groupedCards = useMemo(() => {
+    const groups = new Map<string, typeof displayedCards>();
+    for (const c of displayedCards) {
+      const isListed = (c.Listings?.length ?? 0) > 0;
+      const key = `${c.Card.id}-${c.condition}-${c.notes}-${c.customPrice}-${isListed ? 'listed' : 'unlisted'}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(c);
+    }
+    return Array.from(groups.values());
+  }, [displayedCards]);
 
   const getInstanceValue = (instance: any) => {
     if (instance.customPrice && instance.customPrice > 0) return instance.customPrice;
@@ -234,9 +251,61 @@ export default function CollectionPage() {
                 Sealed Product
               </button>
             </div>
-            <button onClick={() => useGameStore.getState().setSearchOpen(true, "cards")} className={`text-[10px] uppercase tracking-widest ${brandColor} hover:text-white transition-colors flex items-center gap-1`}>
-              <Search size={12} /> Search to Add
-            </button>
+            <div className="flex items-center gap-4">
+              <label className={`cursor-pointer text-[10px] uppercase tracking-widest ${brandColor} hover:text-white transition-colors flex items-center gap-1`}>
+                <Plus size={12} /> Import CSV
+                <input
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const text = await file.text();
+                    
+                    const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+                    if (lines.length < 2) {
+                      toast.error("Empty or invalid CSV file");
+                      return;
+                    }
+                    const headers = lines[0].split(",").map(h => h.replace(/^"|"$/g, "").trim());
+                    const scryfallIdIdx = headers.findIndex(h => h.toLowerCase() === "scryfall id");
+                    const quantityIdx = headers.findIndex(h => h.toLowerCase() === "quantity");
+                    
+                    let totalCards = 0;
+                    let uniqueScryfallIds = new Set();
+                    let rows = 0;
+                    
+                    if (scryfallIdIdx !== -1) {
+                      for (let i = 1; i < lines.length; i++) {
+                        const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(val => val.replace(/^"|"$/g, "").trim());
+                        const sid = row[scryfallIdIdx];
+                        if (sid) {
+                          rows++;
+                          uniqueScryfallIds.add(sid);
+                          const qty = quantityIdx !== -1 && row[quantityIdx] ? parseInt(row[quantityIdx], 10) : 1;
+                          totalCards += qty;
+                        }
+                      }
+                    }
+
+                    if (totalCards === 0) {
+                      toast.error("No valid Scryfall IDs found in CSV");
+                      return;
+                    }
+
+                    setImportStats({ cards: totalCards, rows, uniqueScryfallIds: uniqueScryfallIds.size });
+                    setImportText(text);
+                    setImportModalOpen(true);
+                    
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <button onClick={() => useGameStore.getState().setSearchOpen(true, "cards")} className={`text-[10px] uppercase tracking-widest ${brandColor} hover:text-white transition-colors flex items-center gap-1`}>
+                <Search size={12} /> Search to Add
+              </button>
+            </div>
           </div>
 
           {viewMode === "sealed" ? (
@@ -313,8 +382,25 @@ export default function CollectionPage() {
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {displayedCards.map((instance, i) => {
-                  const isSelected = selected.has(instance.id);
+                {groupedCards.map((group, i) => {
+                  const instance = group[0];
+                  const qty = group.length;
+                  const groupIds = group.map(g => g.id);
+                  const isSelected = groupIds.every(id => selected.has(id));
+                  const isPartial = groupIds.some(id => selected.has(id)) && !isSelected;
+                  
+                  const handleToggleGroup = () => {
+                    setSelected(prev => {
+                      const next = new Set(prev);
+                      if (isSelected) {
+                        groupIds.forEach(id => next.delete(id));
+                      } else {
+                        groupIds.forEach(id => next.add(id));
+                      }
+                      return next;
+                    });
+                  };
+
                   const activeListing = instance.Listings?.[0];
                   return (
                     <motion.div
@@ -322,9 +408,9 @@ export default function CollectionPage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: (i % 20) * 0.05, duration: 0.4 }}
                       key={instance.id}
-                      onClick={() => toggleSelect(instance.id)}
+                      onClick={handleToggleGroup}
                       className={`group relative flex flex-col gap-2 p-3 rounded-xl cursor-pointer transition-all border ${
-                        isSelected
+                        isSelected || isPartial
                           ? `bg-neutral-900 border-white/40 ring-1 ring-white/20`
                           : "bg-neutral-900/40 border-white/5 hover:bg-neutral-900"
                       }`}
@@ -335,6 +421,7 @@ export default function CollectionPage() {
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-neutral-800 font-serif text-xs">No Image</div>
                         )}
+                        
                         <div className="absolute top-2 left-2 w-5 h-5 rounded border flex items-center justify-center transition-colors"
                           style={{ pointerEvents: "none" }}
                         >
@@ -342,28 +429,38 @@ export default function CollectionPage() {
                             <span className={`w-full h-full ${brandBg} flex items-center justify-center`}>
                               <Check size={14} className="text-black" />
                             </span>
+                          ) : isPartial ? (
+                            <span className={`w-full h-full ${brandBg} flex items-center justify-center`}>
+                              <div className="w-2.5 h-0.5 bg-black rounded-full" />
+                            </span>
                           ) : (
                             <span className="w-full h-full bg-black/60 border border-white/30" />
                           )}
                         </div>
 
+                        {qty > 1 && (
+                          <div className="absolute bottom-2 left-2 w-7 h-7 bg-black/80 backdrop-blur text-white flex items-center justify-center rounded-full text-[10px] font-sans font-bold border border-white/10 shadow-lg pointer-events-none z-10">
+                            x{qty}
+                          </div>
+                        )}
+
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDelete([instance.id]);
+                            handleDelete(groupIds);
                           }}
                           disabled={deleting}
-                          className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-black/80 border border-white/20 flex items-center justify-center text-neutral-400 hover:text-rose-500 hover:border-rose-500/50 hover:bg-rose-500/10 transition-colors z-10 opacity-0 group-hover:opacity-100 disabled:opacity-50 shadow-xl backdrop-blur-sm"
+                          className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-black/80 border border-white/20 flex items-center justify-center text-neutral-400 hover:text-rose-500 hover:border-rose-500/50 hover:bg-rose-500/10 transition-colors z-20 opacity-0 group-hover:opacity-100 disabled:opacity-50 shadow-xl backdrop-blur-sm"
                         >
                           <Trash2 size={12} />
                         </button>
                         {activeListing && (
-                          <div className="absolute top-2 right-2 bg-emerald-500/90 text-black px-2 py-0.5 rounded text-[8px] font-sans font-bold uppercase tracking-widest">
+                          <div className="absolute top-2 right-2 bg-emerald-500/90 text-black px-2 py-0.5 rounded text-[8px] font-sans font-bold uppercase tracking-widest z-10">
                             ${activeListing.price.toFixed(2)}
                           </div>
                         )}
                         {!activeListing && (
-                          <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded text-[8px] font-sans uppercase tracking-widest text-white border border-white/10">
+                          <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded text-[8px] font-sans uppercase tracking-widest text-white border border-white/10 z-10">
                             {instance.condition.replace("_", " ")}
                           </div>
                         )}
@@ -581,6 +678,77 @@ export default function CollectionPage() {
                   </button>
                 </div>
               </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+      {importModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !importing && setImportModalOpen(false)} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative bg-[#0a0a0a] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden flex flex-col"
+          >
+            <div className="p-6 border-b border-white/10 flex justify-between items-start">
+              <div>
+                <h3 className="font-serif text-2xl text-white mb-1">Import Collection</h3>
+                <p className="font-sans text-[10px] uppercase tracking-[0.2em] text-neutral-500">
+                  Review your CSV import
+                </p>
+              </div>
+              {!importing && (
+                <button onClick={() => setImportModalOpen(false)} className="text-neutral-500 hover:text-white text-2xl leading-none">&times;</button>
+              )}
+            </div>
+            
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-neutral-900/50 rounded-xl p-4 border border-white/5 text-center">
+                  <div className="font-serif text-3xl text-white mb-1">{importStats.cards}</div>
+                  <div className="font-sans text-[9px] uppercase tracking-[0.2em] text-neutral-500">Total Cards</div>
+                </div>
+                <div className="bg-neutral-900/50 rounded-xl p-4 border border-white/5 text-center">
+                  <div className="font-serif text-3xl text-white mb-1">{importStats.uniqueScryfallIds}</div>
+                  <div className="font-sans text-[9px] uppercase tracking-[0.2em] text-neutral-500">Unique Prints</div>
+                </div>
+              </div>
+              
+              <div className="text-center font-sans text-sm text-neutral-400">
+                You are about to import <span className="text-white font-bold">{importStats.cards}</span> physical cards across <span className="text-white font-bold">{importStats.uniqueScryfallIds}</span> distinct prints. They will be added to your vault, stacking duplicates together automatically.
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-white/10 flex justify-end gap-3">
+              <button
+                onClick={() => setImportModalOpen(false)}
+                disabled={importing}
+                className="px-6 py-3 border border-white/20 text-neutral-300 hover:text-white hover:border-white rounded-lg font-sans text-[10px] uppercase tracking-widest transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setImporting(true);
+                  const toastId = toast.loading("Importing CSV...");
+                  const { importManaboxCSV } = await import("@/app/actions/import");
+                  const res = await importManaboxCSV(importText);
+                  setImporting(false);
+                  setImportModalOpen(false);
+                  
+                  if (res.success) {
+                    toast.update(toastId, { render: `Imported ${res.count} cards!`, type: "success", isLoading: false, autoClose: 3000 });
+                    const vaultRes = await getVault();
+                    if (vaultRes.success && vaultRes.instances) setCards(vaultRes.instances);
+                  } else {
+                    toast.update(toastId, { render: res.error || "Import failed", type: "error", isLoading: false, autoClose: 3000 });
+                  }
+                }}
+                disabled={importing}
+                className={`px-8 py-3 bg-white text-black hover:bg-neutral-200 disabled:opacity-50 rounded-lg font-sans text-[10px] uppercase tracking-widest transition-colors flex items-center gap-2`}
+              >
+                {importing ? "Importing..." : "Confirm Import"}
+              </button>
             </div>
           </motion.div>
         </div>

@@ -9,5 +9,12 @@ export function proxiedImage(url?: string | null): string | undefined {
   if (!url) return undefined;
   // Local/static images don't need the proxy
   if (url.startsWith("/")) return url;
-  return `/api/img?url=${encodeURIComponent(url)}`;
+  
+  // Only proxy Scryfall images as requested
+  if (url.includes("scryfall.com") || url.includes("scryfall.io")) {
+    return `/api/img?url=${encodeURIComponent(url)}`;
+  }
+  
+  // No proxy for TCGCSV/TCGplayer images
+  return url;
 }
