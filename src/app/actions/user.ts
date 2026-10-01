@@ -33,8 +33,8 @@ export async function searchUsers(query: string) {
 
 export async function getUserProfile(username: string) {
   try {
-    const user = await prisma.user.findUnique({
-      where: { username },
+    const user = await prisma.user.findFirst({
+      where: { username: { equals: username, mode: 'insensitive' } },
       select: {
         id: true,
         username: true,
@@ -67,8 +67,8 @@ export async function getUserProfile(username: string) {
 
 export async function getUserVault(username: string, game?: "POKEMON" | "MTG") {
   try {
-    const user = await prisma.user.findUnique({
-      where: { username },
+    const user = await prisma.user.findFirst({
+      where: { username: { equals: username, mode: 'insensitive' } },
       select: { id: true }
     });
     if (!user) return [];
@@ -133,3 +133,4 @@ export async function getUnreadNotifications() {
     return { count: 0 };
   }
 }
+
