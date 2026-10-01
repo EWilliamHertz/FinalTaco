@@ -24,6 +24,9 @@ export default async function TradesPage() {
             Manage your incoming and outgoing offers
           </p>
         </div>
+        <Link href="/trades/new" className="px-8 py-3 bg-white text-black hover:bg-neutral-200 transition-colors rounded-lg font-sans text-xs uppercase tracking-widest flex items-center justify-center">
+          Start Trade
+        </Link>
       </div>
 
       {trades.length === 0 ? (
