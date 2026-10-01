@@ -38,6 +38,9 @@ export default function CollectionPage() {
   const router = useRouter();
   const [cards, setCards] = useState<VaultCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterGame, setFilterGame] = useState<"ALL" | "POKEMON" | "MTG">("ALL");
+  const [filterTag, setFilterTag] = useState("ALL");
+  const [sortBy, setSortBy] = useState<"NEWEST" | "PRICE_DESC" | "PRICE_ASC">("NEWEST");
   const [viewMode, setViewMode] = useState<"cards" | "sealed">("cards");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
@@ -159,9 +162,14 @@ export default function CollectionPage() {
           <h1 className="font-serif text-4xl md:text-5xl text-white font-light uppercase tracking-widest mb-3">
             Your <span className={brandColor}>Vault</span>
           </h1>
-          <p className="font-sans text-neutral-400 text-sm tracking-[0.2em] uppercase">
-            Collection & Portfolio Growth
-          </p>
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <p className="font-sans text-neutral-400 text-sm tracking-[0.2em] uppercase">
+              Collection & Portfolio Growth
+            </p>
+            <Link href="/analytics" className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors rounded-lg font-sans text-[10px] uppercase tracking-widest">
+              View Analytics
+            </Link>
+          </div>
         </div>
 
         <div className="flex gap-12 font-serif">
@@ -372,7 +380,7 @@ export default function CollectionPage() {
             {/* Bulk pricing */}
             <div className="p-6 border-b border-white/10">
               <label className="block font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-3">
-                Default price for all selected cards — % of TCGplayer Market Price
+                Default price for all selected cards — % of TCGCSV Market Price
               </label>
               <div className="flex items-center gap-3">
                 <input

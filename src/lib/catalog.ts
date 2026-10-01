@@ -99,11 +99,21 @@ export async function syncGroupProducts(
   const groupName = group?.name ?? "Unknown Set";
   const setCode = group?.abbreviation ?? null;
 
-  const priceByProduct = new Map<number, any>();
+  const normalPriceByProduct = new Map<number, any>();
+  const foilPriceByProduct = new Map<number, any>();
+
   for (const p of prices) {
-    const prev = priceByProduct.get(p.productId);
-    if (!prev || subtypeRank(p.subTypeName) < subtypeRank(prev.subTypeName)) {
-      priceByProduct.set(p.productId, p);
+    const isFoil = p.subTypeName?.toLowerCase().includes("foil") || p.subTypeName?.toLowerCase().includes("holo");
+    if (isFoil) {
+       const prev = foilPriceByProduct.get(p.productId);
+       if (!prev || subtypeRank(p.subTypeName) < subtypeRank(prev.subTypeName)) {
+         foilPriceByProduct.set(p.productId, p);
+       }
+    } else {
+       const prev = normalPriceByProduct.get(p.productId);
+       if (!prev || subtypeRank(p.subTypeName) < subtypeRank(prev.subTypeName)) {
+         normalPriceByProduct.set(p.productId, p);
+       }
     }
   }
 
@@ -113,9 +123,10 @@ export async function syncGroupProducts(
     const batch = products.slice(i, i + UPSERT_BATCH);
     await prisma.$transaction(
       batch.map((prod: any) => {
-        const price = priceByProduct.get(prod.productId);
-        const priceVal =
-          price?.marketPrice ?? price?.midPrice ?? price?.lowPrice ?? 0;
+        const nPrice = normalPriceByProduct.get(prod.productId) || foilPriceByProduct.get(prod.productId);
+        const fPrice = foilPriceByProduct.get(prod.productId) || normalPriceByProduct.get(prod.productId);
+        const priceVal = nPrice?.marketPrice ?? nPrice?.midPrice ?? nPrice?.lowPrice ?? 0;
+        const foilPriceVal = fPrice?.marketPrice ?? fPrice?.midPrice ?? fPrice?.lowPrice ?? null;
         const ext = (prod.extendedData || []) as {
           name: string;
           value: string;
@@ -127,8 +138,9 @@ export async function syncGroupProducts(
           where: { tcgcsvId: String(prod.productId) },
           update: {
             marketPrice: priceVal,
-            lowPrice: price?.lowPrice ?? null,
-            highPrice: price?.highPrice ?? null,
+            foilPrice: foilPriceVal,
+            lowPrice: nPrice?.lowPrice ?? null,
+            highPrice: nPrice?.highPrice ?? null,
             groupId,
             setName: groupName,
             setCode,
@@ -144,10 +156,10 @@ export async function syncGroupProducts(
             number: findExt("Number"),
             imageUrl: prod.imageUrl || null,
             rarity: findExt("Rarity"),
-            subTypeName: price?.subTypeName ?? null,
+            subTypeName: nPrice?.subTypeName ?? null,
             marketPrice: priceVal,
-            lowPrice: price?.lowPrice ?? null,
-            highPrice: price?.highPrice ?? null,
+            lowPrice: nPrice?.lowPrice ?? null,
+            highPrice: nPrice?.highPrice ?? null,
           },
         });
       })
@@ -213,7 +225,7 @@ export function startFullSync(
   groupIds?: number[]
 ): SyncProgress {
   const p = progressRef();
-  if (p.running) throw new Error("A catalog sync is already running");
+  if (p.running) return p;
 
   const run = async () => {
     try {
@@ -229,7 +241,7 @@ export function startFullSync(
       });
 
       p.categoryIds = categoryIds;
-      p.done = 0;
+      p.done = groups.filter(g => g.syncedAt !== null).length;
       p.total = groups.length;
       p.currentGroup = null;
       p.errors = [];
@@ -238,6 +250,11 @@ export function startFullSync(
       p.finishedAt = null;
 
       for (const grp of groups) {
+        // Skip already synced groups unless explicitly forced via groupIds
+        if (grp.syncedAt !== null && (!groupIds || groupIds.length === 0)) {
+          continue;
+        }
+
         try {
           p.currentGroup = grp.name;
           await syncGroupProducts(grp.categoryId, grp.groupId);

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Settings } from "lucide-react";
+import { Settings, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useGameStore } from "@/lib/store";
@@ -13,6 +13,7 @@ const links = [
   { name: "Database", href: "/database" },
   { name: "Market", href: "/market" },
   { name: "Collection", href: "/collection" },
+  { name: "Decks", href: "/binders" },
 ];
 
 export function Navigation() {
@@ -29,13 +30,29 @@ export function Navigation() {
   const [searchNumber, setSearchNumber] = useState("");
   const [searchUser, setSearchUser] = useState("");
   
-  const [user, setUser] = useState<{username: string, avatarUrl: string | null} | null>(null);
+  const [user, setUser] = useState<{username: string, avatarUrl: string | null, role?: string, id?: string} | null>(null);
+  const [vaultStats, setVaultStats] = useState({ count: 0, value: 0 });
+  const [notifications, setNotifications] = useState(0);
 
   useEffect(() => {
     import("@/app/actions/auth").then(({ getCurrentUser }) => {
       getCurrentUser().then(setUser);
     });
+    const poll = setInterval(() => {
+      import("@/app/actions/user").then(({ getUnreadNotifications }) => {
+        getUnreadNotifications().then(res => setNotifications(res.count));
+      });
+    }, 10000);
+    return () => clearInterval(poll);
   }, [pathname]);
+
+  useEffect(() => {
+    if (isSidebarOpen) {
+      import("@/app/actions/vault").then(({ getVaultStats }) => {
+        getVaultStats().then(setVaultStats);
+      });
+    }
+  }, [isSidebarOpen]);
 
   if (!activeGame && (pathname === "/" || pathname === "/select")) return null;
 
@@ -226,25 +243,54 @@ export function Navigation() {
         </div>
 
         <div className="p-8 flex-1 overflow-y-auto flex flex-col gap-8">
+
+          <div>
+            <h3 className="font-sans text-[10px] uppercase tracking-[0.2em] text-neutral-500 mb-4">Active Realm</h3>
+            <div className="flex gap-2 bg-neutral-900/50 p-1 rounded-xl border border-white/5">
+              {(["pokemon", "mtg", "both"] as const).map((game) => (
+                <button
+                  key={game}
+                  onClick={() => {
+                    useGameStore.getState().setActiveGame(game);
+                  }}
+                  className={`flex-1 py-2 rounded-lg font-sans text-[10px] uppercase tracking-widest transition-colors ${
+                    activeGame === game 
+                      ? 'bg-white text-black shadow-md' 
+                      : 'text-neutral-500 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {game === 'mtg' ? 'Magic' : game}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <h3 className="font-sans text-[10px] uppercase tracking-[0.2em] text-neutral-500 mb-4">Vault Stats</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white/5 p-4 rounded-xl border border-white/5">
                 <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-400 mb-1">Total Value</p>
-                <p className="font-serif text-xl text-white">$42,500</p>
+                <p className="font-serif text-xl text-white">${vaultStats.value.toFixed(2)}</p>
               </div>
               <div className="bg-white/5 p-4 rounded-xl border border-white/5">
                 <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-400 mb-1">Items</p>
-                <p className="font-serif text-xl text-white">143</p>
+                <p className="font-serif text-xl text-white">{vaultStats.count}</p>
               </div>
             </div>
+
+            <Link href="/analytics" onClick={() => setSidebarOpen(false)} className="mt-4 block w-full py-3 bg-blue-500/10 text-blue-400 border border-blue-500/20 text-center rounded-xl font-sans text-[10px] uppercase tracking-widest hover:bg-blue-500/20 transition-colors">
+              View Analytics Dashboard
+            </Link>
           </div>
 
           <div>
             <h3 className="font-sans text-[10px] uppercase tracking-[0.2em] text-neutral-500 mb-4">Quick Links</h3>
             <div className="flex flex-col gap-2 font-serif text-neutral-300">
-              <Link href="/collection" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">My Collection</Link>
-              <Link href="/market" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">My Listings</Link>
+              <Link href="/feed" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors md:hidden">Feed</Link>
+              <Link href="/database" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors md:hidden">Database</Link>
+              <Link href="/market" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">Market</Link>
+              <Link href="/collection" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">Collection</Link>
+              <Link href="/binders" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors md:hidden">Decks</Link>
               <Link href="/settings" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">Account Settings</Link>
             </div>
           </div>

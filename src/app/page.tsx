@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { checkEmail, loginUser, registerUser } from "@/app/actions/auth";
+import { toast } from "react-toastify";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -61,21 +62,21 @@ export default function AuthPage() {
     if (res.success) {
       router.push("/select");
     } else {
-      alert(res.error);
+      toast.error(res.error);
     }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      alert("Passwords do not match");
+      toast.error("Passwords do not match");
       return;
     }
     const res = await registerUser(email, username, password);
     if (res.success) {
       router.push("/select");
     } else {
-      alert(res.error);
+      toast.error(res.error);
     }
   };
 

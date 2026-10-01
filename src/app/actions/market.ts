@@ -132,3 +132,30 @@ export async function cancelListing(listingId: string) {
     return { success: false, error: "Failed to cancel listing" };
   }
 }
+
+export async function getMarketplaceListings(game?: string) {
+  try {
+    const whereClause: any = { status: "ACTIVE" };
+    if (game && game !== "both") {
+      whereClause.CardInstance = {
+        Card: { game: game === "pokemon" ? "POKEMON" : "MTG" }
+      };
+    }
+
+    const listings = await prisma.marketListing.findMany({
+      where: whereClause,
+      include: {
+        Seller: { select: { username: true } },
+        CardInstance: {
+          include: { Card: true }
+        }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return listings;
+  } catch (error) {
+    console.error("Fetch marketplace error:", error);
+    return [];
+  }
+}

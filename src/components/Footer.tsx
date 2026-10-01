@@ -1,10 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export function Footer() {
   const pathname = usePathname();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    import("@/app/actions/auth").then(({ getCurrentUser }) => {
+      getCurrentUser().then(user => {
+        if (user && (user.role === 'ADMIN' || user.email === 'swagyser9@gmail.com')) {
+          setIsAdmin(true);
+        }
+      });
+    });
+  }, []);
   
   if (pathname === "/" || pathname === "/select") return null;
 
@@ -17,6 +29,9 @@ export function Footer() {
         </div>
 
         <div className="flex items-center gap-6">
+          {isAdmin && (
+            <Link href="/admin" className="font-sans text-[10px] uppercase tracking-widest text-emerald-500 hover:text-emerald-400 transition-colors">Admin Panel</Link>
+          )}
           <Link href="/about" className="font-sans text-[10px] uppercase tracking-widest text-neutral-500 hover:text-white transition-colors">About</Link>
           <Link href="/terms" className="font-sans text-[10px] uppercase tracking-widest text-neutral-500 hover:text-white transition-colors">Terms</Link>
           <Link href="/privacy" className="font-sans text-[10px] uppercase tracking-widest text-neutral-500 hover:text-white transition-colors">Privacy</Link>

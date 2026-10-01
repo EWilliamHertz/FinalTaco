@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "react-toastify";
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useGameStore } from "@/lib/store";
@@ -24,6 +25,16 @@ function SearchPage() {
   const [setsSynced, setSetsSynced] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
+  
+  // Vault Modal State
+  const [selectedCard, setSelectedCard] = useState<CatalogCard | null>(null);
+  const [vaultQuantity, setVaultQuantity] = useState(1);
+  const [vaultCondition, setVaultCondition] = useState("NEAR_MINT");
+  const [vaultNotes, setVaultNotes] = useState("");
+  const [isFoil, setIsFoil] = useState(false);
+  const [isSigned, setIsSigned] = useState(false);
+  const [customPrice, setCustomPrice] = useState("");
+  const [isSubmittingVault, setIsSubmittingVault] = useState(false);
   const [added, setAdded] = useState<Record<string, boolean>>({});
   const [catalog, setCatalog] = useState<{ groups: number; cards: number; syncedGroups: number; groupsError?: string | null; sync: { running: boolean; done: number; total: number; currentGroup: string | null } } | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -92,29 +103,51 @@ function SearchPage() {
     }
   }, [activeGame, name, set, number]);
 
-  const handleAdd = async (card: CatalogCard) => {
-    if (!activeGame || activeGame === "both") {
-      alert("Please select a game first");
+  const openAddModal = (card: CatalogCard) => {
+    if (added[card.tcgcsvId]) {
+      toast.info("This card is already added during this session.");
       return;
     }
-    setAddingId(card.tcgcsvId);
+    setSelectedCard(card);
+    setVaultQuantity(1);
+    setVaultCondition("NEAR_MINT");
+    setVaultNotes("");
+    setIsFoil(false);
+    setIsSigned(false);
+    setCustomPrice("");
+  };
+
+  const handleConfirmAdd = async () => {
+    if (!selectedCard) return;
+    setIsSubmittingVault(true);
+
+    const gameType = selectedCard.game.toLowerCase() === "pokemon" ? "pokemon" : "mtg";
+
     const res = await addToVault({
-      tcgcsvId: card.tcgcsvId,
-      game: activeGame === "pokemon" ? "pokemon" : "mtg",
-      name: card.name,
-      setName: card.setName,
-      imageUrl: card.imageUrl || "",
-      rarity: card.rarity || undefined,
-      marketPrice: card.marketPrice,
-      setCode: card.setCode || undefined,
-      number: card.number || undefined,
+      tcgcsvId: selectedCard.tcgcsvId,
+      game: gameType as any,
+      name: selectedCard.name,
+      setName: selectedCard.setName,
+      imageUrl: selectedCard.imageUrl || "",
+      rarity: selectedCard.rarity || undefined,
+      marketPrice: selectedCard.marketPrice,
+      setCode: selectedCard.setCode || undefined,
+      number: selectedCard.number || undefined,
+      condition: vaultCondition,
+      quantity: vaultQuantity,
+      notes: [isFoil ? "Foil" : "", isSigned ? "Signed" : "", vaultNotes].filter(Boolean).join(", "),
+      customPrice: customPrice ? parseFloat(customPrice) : undefined
     });
+
     if (res.success) {
-      setAdded((prev) => ({ ...prev, [card.tcgcsvId]: true }));
+      setAdded((prev) => ({ ...prev, [selectedCard.tcgcsvId]: true }));
+      toast.success(`Added ${vaultQuantity}x ${selectedCard.name} to Vault`);
+      setSelectedCard(null);
     } else {
-      alert(res.error);
+      toast.error(res.error || "Failed to add to vault");
     }
-    setAddingId(null);
+    
+    setIsSubmittingVault(false);
   };
 
   const syncPct = catalog && catalog.groups > 0 ? Math.round((catalog.syncedGroups / catalog.groups) * 100) : 0;
@@ -173,7 +206,11 @@ function SearchPage() {
           ) : results.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {results.map((card) => (
-                <div key={card.tcgcsvId} className="group relative">
+                <div 
+                  key={card.tcgcsvId} 
+                  className="group relative cursor-pointer"
+                  onClick={() => openAddModal(card)}
+                >
                   <div className="relative aspect-[63/88] rounded-xl overflow-hidden border border-white/10 group-hover:border-white/30 transition-colors mb-3">
                     {card.imageUrl ? (
                       <Image src={card.imageUrl} alt={card.name} fill className="object-cover" unoptimized />
@@ -185,25 +222,8 @@ function SearchPage() {
                         ${card.marketPrice.toFixed(2)}
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                      <button
-                        onClick={() => handleAdd(card)}
-                        disabled={addingId === card.tcgcsvId || added[card.tcgcsvId]}
-                        className="py-3 px-5 bg-white/10 hover:bg-white text-white hover:text-black rounded-full font-sans text-[10px] uppercase tracking-widest border border-white/20 hover:border-white transition-all flex items-center gap-2 disabled:opacity-60"
-                      >
-                        {added[card.tcgcsvId] ? (
-                          <>
-                            <Check size={14} /> In Vault
-                          </>
-                        ) : (
-                          <>
-                            <Plus size={14} /> {addingId === card.tcgcsvId ? "Adding..." : "Add to Vault"}
-                          </>
-                        )}
-                      </button>
-                    </div>
                   </div>
-                  <h3 className="font-serif text-white text-sm truncate">{card.name}</h3>
+                  <h3 className="font-serif text-white text-sm truncate group-hover:text-blue-400 transition-colors">{card.name}</h3>
                   <p className="font-sans text-[9px] uppercase tracking-widest text-neutral-500 truncate">
                     {card.setName} {card.number && `• #${card.number}`}
                   </p>
@@ -215,7 +235,7 @@ function SearchPage() {
               <p className="font-serif text-2xl text-neutral-400 mb-2">No Results Found</p>
               <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-6 max-w-md leading-relaxed">
                 {catalog && catalog.cards === 0
-                  ? "The card catalog is empty — enter a set code (e.g. OTP, PAF, SWSH12) to pull that set from TCGplayer, or sync the full catalog above."
+                  ? "The card catalog is empty — enter a set code (e.g. OTP, PAF, SWSH12) to pull that set from TCGCSV, or sync the full catalog above."
                   : catalog && catalog.syncedGroups < catalog.groups
                     ? "Only a few sets are ingested so far. Try a set code, or sync the full catalog above to search by name across everything."
                     : "Try adjusting your search parameters."}
@@ -227,6 +247,104 @@ function SearchPage() {
           )}
         </>
       )}
+    
+      {selectedCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-neutral-900 border border-white/20 p-6 rounded-2xl w-full max-w-md shadow-2xl relative">
+            <button onClick={() => setSelectedCard(null)} className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors">
+              &times;
+            </button>
+            <h2 className="font-serif text-2xl text-white mb-2 truncate">{selectedCard.name}</h2>
+            <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-400 mb-6">{selectedCard.setName}</p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-2">Quantity</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  max="100" 
+                  value={vaultQuantity} 
+                  onChange={(e) => setVaultQuantity(parseInt(e.target.value) || 1)}
+                  className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white font-sans focus:outline-none focus:border-white/30"
+                />
+              </div>
+
+              <div>
+                <label className="block font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-2">Condition</label>
+                <select 
+                  value={vaultCondition}
+                  onChange={(e) => setVaultCondition(e.target.value)}
+                  className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white font-sans focus:outline-none focus:border-white/30"
+                >
+                  <option value="MINT">Mint (M)</option>
+                  <option value="NEAR_MINT">Near Mint (NM)</option>
+                  <option value="LIGHTLY_PLAYED">Lightly Played (LP)</option>
+                  <option value="MODERATELY_PLAYED">Moderately Played (MP)</option>
+                  <option value="HEAVILY_PLAYED">Heavily Played (HP)</option>
+                  <option value="DAMAGED">Damaged (DMG)</option>
+                </select>
+              </div>
+
+              
+              
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => setIsFoil(!isFoil)}
+                  className={`flex-1 py-2 rounded-lg font-sans text-[10px] uppercase tracking-widest border transition-colors ${isFoil ? 'bg-white text-black border-white' : 'bg-black/50 text-neutral-400 border-white/10 hover:border-white/30'}`}
+                >
+                  Foil
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSigned(!isSigned)}
+                  className={`flex-1 py-2 rounded-lg font-sans text-[10px] uppercase tracking-widest border transition-colors ${isSigned ? 'bg-white text-black border-white' : 'bg-black/50 text-neutral-400 border-white/10 hover:border-white/30'}`}
+                >
+                  Signed
+                </button>
+              </div>
+
+              <div>
+                <label className="block font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-2">Additional Notes (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Graded PSA 9..."
+                  value={vaultNotes} 
+                  onChange={(e) => setVaultNotes(e.target.value)}
+                  className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white font-sans focus:outline-none focus:border-white/30"
+                />
+              </div>
+
+
+
+              
+              <div>
+                <label className="block font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-2">Custom Price / Appraised Value ($)</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 150.00"
+                  value={customPrice} 
+                  onChange={(e) => setCustomPrice(e.target.value)}
+                  className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white font-sans focus:outline-none focus:border-white/30"
+                />
+              </div>
+
+              <button 
+                onClick={handleConfirmAdd}
+
+                disabled={isSubmittingVault}
+                className="w-full mt-4 py-3 bg-white text-black rounded-lg font-sans text-[10px] uppercase tracking-widest hover:bg-neutral-200 transition-colors disabled:opacity-50"
+              >
+                {isSubmittingVault ? "Adding..." : "Add to Vault"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

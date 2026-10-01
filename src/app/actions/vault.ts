@@ -30,6 +30,10 @@ export async function addToVault(data: {
   setCode?: string;
   number?: string;
   marketPrice?: number;
+  condition?: any;
+  notes?: string;
+  quantity?: number;
+  customPrice?: number;
 }) {
   try {
     const userId = await getUserId();
@@ -58,19 +62,22 @@ export async function addToVault(data: {
       },
     });
 
-    // 2. Create CardInstance in user's vault
-    await prisma.cardInstance.create({
-      data: {
+    // 2. Create CardInstance(s) in user's vault
+    const qty = data.quantity || 1;
+    await prisma.cardInstance.createMany({
+      data: Array.from({ length: qty }).map(() => ({
         ownerId: userId,
         cardId: cardRef.id,
-        condition: "NEAR_MINT",
-      },
+        condition: data.condition || "NEAR_MINT",
+        notes: data.notes || null,
+        customPrice: data.customPrice || null,
+      })),
     });
 
     return { success: true };
   } catch (error) {
     console.error("Add to vault error:", error);
-    return { success: false, error: "Failed to add to vault" };
+    return { success: false, error: error instanceof Error ? error.message : "Failed to add to vault" };
   }
 }
 
@@ -117,5 +124,28 @@ export async function removeCard(instanceId: string) {
   } catch (error) {
     console.error("Remove card error:", error);
     return { success: false, error: "Failed to remove card" };
+  }
+}
+
+export async function getVaultStats() {
+  try {
+    const userId = await getUserId();
+    if (!userId) return { count: 0, value: 0 };
+    
+    const instances = await prisma.cardInstance.findMany({
+      where: { ownerId: userId },
+      include: { Card: { select: { marketPrice: true, foilPrice: true } } }
+    });
+    
+    const count = instances.length;
+    const value = instances.reduce((acc, inst) => {
+      if (inst.customPrice !== null) return acc + inst.customPrice;
+      const isFoil = inst.notes?.toLowerCase().includes("foil") || inst.notes?.toLowerCase().includes("holo");
+      if (isFoil && inst.Card.foilPrice) return acc + inst.Card.foilPrice;
+      return acc + (inst.Card.marketPrice || 0);
+    }, 0);
+    return { count, value };
+  } catch {
+    return { count: 0, value: 0 };
   }
 }

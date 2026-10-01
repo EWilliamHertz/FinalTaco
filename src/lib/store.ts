@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export type GameSelection = 'pokemon' | 'mtg' | 'both' | null;
 
@@ -12,12 +13,20 @@ interface GameState {
   setSearchOpen: (isOpen: boolean, mode?: "all" | "cards") => void;
 }
 
-export const useGameStore = create<GameState>((set) => ({
+export const useGameStore = create<GameState>()(
+  persist(
+    (set) => ({
   activeGame: null,
   setActiveGame: (game) => set({ activeGame: game }),
   isSidebarOpen: false,
   setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
   isSearchOpen: false,
   searchMode: "all",
-  setSearchOpen: (isOpen, mode = "all") => set({ isSearchOpen: isOpen, searchMode: mode }),
-}));
+      setSearchOpen: (isOpen, mode = "all") => set({ isSearchOpen: isOpen, searchMode: mode }),
+    }),
+    {
+      name: "hatake-storage",
+      partialize: (state) => ({ activeGame: state.activeGame }),
+    }
+  )
+);

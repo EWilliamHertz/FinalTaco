@@ -25,6 +25,13 @@ model User {
   Posts             Post[]
   Purchases         Deal[]         @relation("BuyerDeals")
   Sales             Deal[]         @relation("SellerDeals")
+  PostLikes         PostLike[]
+  Comments          Comment[]
+  Followers         Follows[] @relation("Following")
+  Following         Follows[] @relation("Followers")
+  SentMessages      Message[] @relation("SentMessages")
+  ReceivedMessages  Message[] @relation("ReceivedMessages")
+  Notifications     Notification[]
 }
 
 model CardReference {
@@ -41,6 +48,7 @@ model CardReference {
   rarity       String?
   subTypeName  String? // Normal / Holofoil / Reverse Holofoil
   marketPrice  Float          @default(0.0)
+  foilPrice    Float?
   lowPrice     Float?
   highPrice    Float?
 
@@ -67,6 +75,7 @@ model CardInstance {
   cardId       String
   condition    Condition      @default(NEAR_MINT)
   purchasePrice Float?
+  customPrice   Float?
   notes        String?
   acquiredAt   DateTime       @default(now())
 
@@ -112,7 +121,9 @@ model Post {
   likes     Int      @default(0)
   createdAt DateTime @default(now())
 
-  Author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  Author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  PostLikes PostLike[]
+  Comments  Comment[]
 }
 
 enum Role {
@@ -145,4 +156,65 @@ enum DealStatus {
   PAID
   SHIPPED
   COMPLETED
+}
+
+model PostLike {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  Post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  Post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  Author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+
+model Follows {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  Follower  User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  Following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  content    String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  Sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  Receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  @@index([senderId, receiverId])
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  userId     String
+  type       String   // e.g. "LIKE", "COMMENT", "FOLLOW", "TRADE"
+  content    String
+  link       String?
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  User       User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

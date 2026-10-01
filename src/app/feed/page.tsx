@@ -1,57 +1,87 @@
 "use client";
+import { toast } from "react-toastify";
 
-import { motion } from "framer-motion";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { getPosts, createPost, toggleLike, addComment, editPost, deletePost } from "@/app/actions/post";
+import { getCurrentUser } from "@/app/actions/auth";
+import { Heart, MessageCircle, Share2, Plus, ImageIcon, UploadCloud } from "lucide-react";
 import Image from "next/image";
-import { Heart, MessageCircle, Share2, Plus, Image as ImageIcon } from "lucide-react";
 import { useGameStore } from "@/lib/store";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
-import { getPosts, createPost } from "@/app/actions/post";
+import { motion } from "framer-motion";
+import Link from "next/link";
 
 export default function FeedPage() {
-  const activeGame = useGameStore((state) => state.activeGame);
-  const router = useRouter();
-  
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
   const [isPosting, setIsPosting] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
   
+  // Pagination
+  const [skip, setSkip] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  
+  const TAKE = 12;
+
   const formRef = useRef<HTMLFormElement>(null);
+  const activeGame = useGameStore((state) => state.activeGame);
+  
+  const brandColor = activeGame === "pokemon" ? "text-yellow-400" : "text-orange-500";
+  const hoverText = activeGame === "pokemon" ? "hover:text-yellow-400" : "hover:text-orange-500";
+  const buttonBg = activeGame === "pokemon" ? "bg-yellow-400 text-black hover:bg-yellow-300" : "bg-orange-500 text-black hover:bg-orange-400";
+  const hoverBorder = activeGame === "pokemon" ? "hover:border-yellow-400/30" : "hover:border-orange-500/30";
 
-  useEffect(() => {
-    if (!activeGame) router.push("/");
-  }, [activeGame, router]);
-
-  useEffect(() => {
-    getPosts().then(data => {
-      setPosts(data);
-      setLoading(false);
-    });
+  const fetchInitial = useCallback(async () => {
+    setLoading(true);
+    const user = await getCurrentUser();
+    setCurrentUser(user);
+    const initialPosts = await getPosts(0, TAKE);
+    setPosts(initialPosts);
+    setHasMore(initialPosts.length === TAKE);
+    setSkip(TAKE);
+    setLoading(false);
   }, []);
 
-  if (!activeGame) return null;
+  useEffect(() => {
+    fetchInitial();
+  }, [fetchInitial]);
 
-  const brandColor = activeGame === "pokemon" ? "text-yellow-400" : activeGame === "mtg" ? "text-orange-500" : "text-emerald-400";
-  const hoverBorder = activeGame === "pokemon" ? "hover:border-yellow-400/30" : activeGame === "mtg" ? "hover:border-orange-500/30" : "hover:border-emerald-400/30";
-  const hoverText = activeGame === "pokemon" ? "hover:text-yellow-400" : activeGame === "mtg" ? "hover:text-orange-500" : "hover:text-emerald-400";
-  const buttonBg = activeGame === "pokemon" ? "bg-yellow-400 text-black hover:bg-yellow-300" : activeGame === "mtg" ? "bg-orange-500 text-black hover:bg-orange-400" : "bg-emerald-400 text-black hover:bg-emerald-300";
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const morePosts = await getPosts(skip, TAKE);
+    if (morePosts.length > 0) {
+      setPosts(prev => [...prev, ...morePosts]);
+      setSkip(prev => prev + TAKE);
+    }
+    if (morePosts.length < TAKE) {
+      setHasMore(false);
+    }
+    setLoadingMore(false);
+  };
 
-  async function handlePost(formData: FormData) {
-    formData.append("game", activeGame!);
+  const handlePost = async (formData: FormData) => {
     setIsPosting(true);
+    if (selectedImage) {
+      formData.append("imageFile", selectedImage);
+    }
+    
     const res = await createPost(formData);
     if (res.success) {
       formRef.current?.reset();
-      const updated = await getPosts();
-      setPosts(updated);
+      setSelectedImage(null);
+      await fetchInitial();
     } else {
-      alert(res.error);
+      toast.error(res.error);
     }
     setIsPosting(false);
-  }
+  };
 
   return (
-    <main className="min-h-screen pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-[1600px] mx-auto">
+    <main className="min-h-screen pt-32 pb-20 px-6 lg:px-12 max-w-[1400px] mx-auto">
       <div className="mb-12 flex flex-col items-center justify-center space-y-4">
         <h1 className="font-serif text-4xl md:text-5xl text-white font-light uppercase tracking-widest">
           The <span className={brandColor}>Feed</span>
@@ -68,15 +98,27 @@ export default function FeedPage() {
             placeholder="Share a pull, a deck, or a thought..."
             className="w-full bg-transparent text-white font-serif resize-none focus:outline-none placeholder:text-neutral-600 mb-4"
             rows={3}
-            required
+            required={!selectedImage}
           />
+          {selectedImage && (
+            <div className="mb-4 text-xs font-sans text-emerald-400 flex items-center gap-2 bg-emerald-500/10 p-2 rounded">
+              <UploadCloud size={14} /> {selectedImage.name} attached
+              <button type="button" onClick={() => setSelectedImage(null)} className="ml-auto hover:text-white">&times; Remove</button>
+            </div>
+          )}
           <div className="flex items-center justify-between border-t border-white/5 pt-4">
-            <div className="flex gap-2">
-              <label className="cursor-pointer text-neutral-500 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5">
+            <div className="flex gap-4">
+              <label className="cursor-pointer text-neutral-500 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5 flex items-center gap-2">
                 <ImageIcon size={18} />
-                <input type="text" name="image" placeholder="Image URL (optional)" className="hidden" />
+                <span className="text-[10px] uppercase font-sans tracking-widest hidden sm:inline">Upload Image</span>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => setSelectedImage(e.target.files?.[0] || null)}
+                  className="hidden" 
+                />
               </label>
-              <input type="text" name="image" placeholder="Image URL (optional)" className="bg-black/50 border border-white/10 rounded-lg px-3 text-xs text-white focus:outline-none font-sans" />
+              <input type="text" name="image" placeholder="Or paste URL..." className="bg-black/50 border border-white/10 rounded-lg px-3 text-xs text-white focus:outline-none font-sans w-24 sm:w-48" />
             </div>
             <button 
               type="submit" 
@@ -103,20 +145,44 @@ export default function FeedPage() {
               key={post.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1, duration: 0.8, ease: "easeOut" }}
-              className={`break-inside-avoid relative group rounded-2xl overflow-hidden bg-neutral-900/50 border border-white/5 ${hoverBorder} transition-colors duration-500 cursor-pointer backdrop-blur-sm`}
+              transition={{ delay: (i % TAKE) * 0.1, duration: 0.8, ease: "easeOut" }}
+              className={`break-inside-avoid relative group rounded-2xl overflow-hidden bg-neutral-900/50 border border-white/5 ${hoverBorder} transition-colors duration-500 backdrop-blur-sm flex flex-col`}
             >
+
+              {currentUser && (currentUser.id === post.authorId || currentUser.role === "ADMIN") && (
+                <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  <button onClick={() => {
+                    setEditingPostId(post.id);
+                    setEditContent(post.content);
+                  }} className="p-1.5 bg-black/50 hover:bg-white text-neutral-400 hover:text-black rounded transition-colors backdrop-blur-md border border-white/10">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                  </button>
+                  <button onClick={async () => {
+                    if (confirm("Delete this post?")) {
+                      const res = await deletePost(post.id);
+                      if (res.success) {
+                        toast.success("Post deleted");
+                        setPosts(prev => prev.filter(p => p.id !== post.id));
+                      } else toast.error(res.error);
+                    }
+                  }} className="p-1.5 bg-black/50 hover:bg-rose-500 text-neutral-400 hover:text-white rounded transition-colors backdrop-blur-md border border-white/10">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                </div>
+              )}
               <div className="p-5 border-b border-white/5 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-neutral-800 flex items-center justify-center">
+                <Link href={`/profile/${post.Author.username}`} className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-neutral-800 flex items-center justify-center cursor-pointer">
                   {post.Author.avatarUrl ? (
                     <img src={post.Author.avatarUrl} alt={post.Author.username} className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-[10px] text-neutral-400 font-serif">{post.Author.username.slice(0,3).toUpperCase()}</span>
                   )}
-                </div>
+                </Link>
                 <div>
-                  <span className="font-sans text-xs text-white font-medium uppercase tracking-widest">{post.Author.username}</span>
-                  <span className="block font-serif text-[10px] text-neutral-500">{new Date(post.createdAt).toLocaleDateString()}</span>
+                  <Link href={`/profile/${post.Author.username}`} className="font-sans text-xs text-white font-medium uppercase tracking-widest hover:text-emerald-400 transition-colors">
+                    {post.Author.username}
+                  </Link>
+                  <span className="block font-serif text-[10px] text-neutral-500">{new Date(post.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>
                 </div>
               </div>
 
@@ -127,35 +193,116 @@ export default function FeedPage() {
                     alt={`Post by ${post.Author.username}`}
                     width={600}
                     height={800}
-                    className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                    className="w-full h-auto object-cover transition-transform duration-700 ease-out"
                     unoptimized
                   />
                 </div>
               )}
               
-              <div className="p-5">
-                <p className="font-serif text-neutral-300 text-sm mb-4">
-                  {post.content}
-                </p>
+              <div className="p-5 flex-1 flex flex-col">
                 
-                <div className="flex items-center gap-4 text-neutral-400">
-                  <button className={`flex items-center gap-1.5 ${hoverText} transition-colors`}>
-                    <Heart size={18} strokeWidth={1.5} />
+                {editingPostId === post.id ? (
+                  <div className="mb-4">
+                    <textarea 
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      className="w-full bg-black/50 text-white font-serif resize-none focus:outline-none border border-white/20 p-2 rounded-lg text-sm"
+                      rows={3}
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button onClick={async () => {
+                        const res = await editPost(post.id, editContent);
+                        if (res.success) {
+                          setPosts(prev => prev.map(p => p.id === post.id ? { ...p, content: editContent } : p));
+                          setEditingPostId(null);
+                          toast.success("Post updated");
+                        } else toast.error(res.error);
+                      }} className="px-3 py-1 bg-white text-black text-[10px] uppercase tracking-widest rounded">Save</button>
+                      <button onClick={() => setEditingPostId(null)} className="px-3 py-1 border border-white/20 text-white text-[10px] uppercase tracking-widest rounded hover:bg-white/5">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="font-serif text-neutral-300 text-sm mb-4">{post.content}</p>
+                )}
+
+                
+                <div className="flex items-center gap-4 text-neutral-400 mb-4 mt-auto">
+                  <button 
+                    onClick={async () => {
+                      await toggleLike(post.id);
+                      const updated = await getPosts(0, skip);
+                      setPosts(updated);
+                    }}
+                    className={`flex items-center gap-1.5 transition-colors ${post.hasLiked ? brandColor : hoverText}`}
+                  >
+                    <Heart size={18} strokeWidth={1.5} className={post.hasLiked ? "fill-current" : ""} />
                     <span className="text-xs">{post.likes}</span>
                   </button>
-                  <button className="flex items-center gap-1.5 hover:text-white transition-colors">
+                  <button 
+                    onClick={() => {
+                      const el = document.getElementById(`comment-form-${post.id}`);
+                      if (el) {
+                        el.classList.toggle('hidden');
+                        el.querySelector('input')?.focus();
+                      }
+                    }}
+                    className="flex items-center gap-1.5 hover:text-white transition-colors"
+                  >
                     <MessageCircle size={18} strokeWidth={1.5} />
-                    <span className="text-xs">0</span>
+                    <span className="text-xs">{post.Comments?.length || 0}</span>
                   </button>
-                  <button className="ml-auto hover:text-white transition-colors">
-                    <Share2 size={18} strokeWidth={1.5} />
-                  </button>
+                </div>
+
+                <div className="space-y-3 mt-4 border-t border-white/5 pt-4">
+                  {post.Comments?.map((comment: any) => (
+                    <div key={comment.id} className="flex gap-2 items-start">
+                      <Link href={`/profile/${comment.Author.username}`} className="font-sans text-[10px] font-bold text-white uppercase hover:text-emerald-400 transition-colors">
+                        {comment.Author.username}
+                      </Link>
+                      <span className="font-serif text-xs text-neutral-300">{comment.content}</span>
+                    </div>
+                  ))}
+                  
+                  <form 
+                    id={`comment-form-${post.id}`} 
+                    className="hidden mt-2 flex gap-2"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const form = e.target as HTMLFormElement;
+                      const input = form.elements.namedItem('content') as HTMLInputElement;
+                      if (!input.value.trim()) return;
+                      await addComment(post.id, input.value);
+                      form.reset();
+                      const updated = await getPosts(0, skip);
+                      setPosts(updated);
+                    }}
+                  >
+                    <input 
+                      type="text" 
+                      name="content" 
+                      placeholder="Add a comment..." 
+                      className="flex-1 bg-transparent border-b border-white/10 text-xs text-white px-0 py-1 focus:outline-none focus:border-white/40 font-serif"
+                    />
+                    <button type="submit" className="text-[10px] font-sans uppercase tracking-widest text-neutral-400 hover:text-white">Post</button>
+                  </form>
                 </div>
               </div>
             </motion.div>
           ))
         )}
       </div>
+
+      {posts.length > 0 && hasMore && (
+        <div className="mt-16 flex justify-center">
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="px-8 py-3 border border-white/20 hover:border-white text-neutral-400 hover:text-white rounded-full font-sans text-xs uppercase tracking-widest transition-all bg-neutral-900/50 backdrop-blur-sm disabled:opacity-50"
+          >
+            {loadingMore ? "Loading..." : "Load More Posts"}
+          </button>
+        </div>
+      )}
     </main>
   );
 }

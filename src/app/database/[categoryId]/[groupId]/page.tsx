@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "react-toastify";
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
@@ -58,9 +59,9 @@ export default function SetDetailsPage() {
 
     if (res.success) {
       // Show success animation or toast
-      alert(`Added ${product.name} to Vault!`);
+      toast.error(`Added ${product.name} to Vault!`);
     } else {
-      alert(res.error);
+      toast.error(res.error);
     }
     setAddingId(null);
   };
