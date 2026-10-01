@@ -30,6 +30,8 @@ export async function addToVault(data: {
   setCode?: string;
   number?: string;
   marketPrice?: number;
+  foilPrice?: number | null;
+  reversePrice?: number | null;
   condition?: any;
   notes?: string;
   quantity?: number;
@@ -46,6 +48,8 @@ export async function addToVault(data: {
       where: { tcgcsvId: data.tcgcsvId },
       update: {
         marketPrice: data.marketPrice ?? undefined,
+        foilPrice: data.foilPrice !== undefined ? data.foilPrice : undefined,
+        reversePrice: data.reversePrice !== undefined ? data.reversePrice : undefined,
         setCode: data.setCode ?? undefined,
         number: data.number ?? undefined,
       },
@@ -59,6 +63,8 @@ export async function addToVault(data: {
         setCode: data.setCode ?? null,
         number: data.number ?? null,
         marketPrice: data.marketPrice ?? 0,
+        foilPrice: data.foilPrice ?? null,
+        reversePrice: data.reversePrice ?? null,
       },
     });
 
@@ -147,5 +153,25 @@ export async function getVaultStats() {
     return { count, value };
   } catch {
     return { count: 0, value: 0 };
+  }
+}
+
+export async function removeFromVault(instanceIds: string[]) {
+  try {
+    const userId = await getUserId();
+    if (!userId) return { success: false, error: "Not logged in" };
+
+    // Delete instances that belong to the user
+    await prisma.cardInstance.deleteMany({
+      where: {
+        id: { in: instanceIds },
+        ownerId: userId,
+      }
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Remove from vault error:", error);
+    return { success: false, error: "Failed to remove items from vault" };
   }
 }

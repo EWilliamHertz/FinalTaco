@@ -9,7 +9,10 @@ import {
   startFullSync,
   getSyncProgress,
 } from "@/lib/catalog";
+import { searchScryfall } from "@/lib/scryfall";
 import type { GameType, Prisma } from "@prisma/client";
+
+const STOPWORDS = new Set(["the", "of", "and", "a", "to", "in", "is", "you", "that", "it", "he", "was", "for", "on", "are", "as", "with", "his", "they", "i", "at", "be", "this", "have", "from", "or", "one", "had", "by", "word", "but", "not", "what", "all", "were", "we", "when", "your", "can", "said", "there", "use", "an", "each", "which", "she", "do", "how", "their", "if", "will", "up", "other", "about", "out", "many", "then", "them", "these", "so", "some", "her", "would", "make", "like", "him", "into", "time", "has", "look", "two", "more", "write", "go", "see", "number", "no", "way", "could", "people", "my", "than", "first", "water", "been", "call", "who", "oil", "its", "now", "find", "long", "down", "day", "did", "get", "come", "made", "may", "part"]);
 
 export interface CatalogSearchInput {
   name?: string;
@@ -27,6 +30,8 @@ export interface CatalogCard {
   imageUrl: string | null;
   rarity: string | null;
   marketPrice: number;
+  foilPrice: number | null;
+  reversePrice: number | null;
   game: string;
 }
 
@@ -63,6 +68,7 @@ export async function searchCatalog(
     }
   }
 
+  
   const games: GameType[] =
     input.game === "pokemon"
       ? ["POKEMON"]
@@ -71,117 +77,132 @@ export async function searchCatalog(
         : ["POKEMON", "MTG"];
 
   const setsSynced: string[] = [];
+  
+  let mapped: CatalogCard[] = [];
 
-  if (set) {
-    const categoryIds = games.map((g) =>
-      g === "MTG" ? CATEGORY_IDS.mtg : CATEGORY_IDS.pokemon
-    );
-    for (const categoryId of categoryIds) {
-      const groups = await findGroupsByCode(categoryId, set);
-      for (const grp of groups) {
-        if (setsSynced.length >= MAX_AUTO_SYNCED_SETS) break;
-        const known = await prisma.cardReference.findFirst({
-          where: { groupId: grp.groupId },
-          select: { id: true },
+  // MTG Scryfall Search
+  if (games.includes("MTG") && (name || set || number)) {
+    try {
+      const scryfallCards = await searchScryfall(name, set, number);
+      for (const c of scryfallCards) {
+        // Many Scryfall cards have multiple faces. Use front face name if available.
+        const cardName = c.name.includes(" // ") ? c.name.split(" // ")[0] : c.name;
+        
+        mapped.push({
+          tcgcsvId: c.tcgplayer_id ? String(c.tcgplayer_id) : `scryfall-${c.id}`,
+          name: cardName,
+          setName: c.set_name,
+          setCode: c.set?.toUpperCase() || null,
+          number: c.collector_number || null,
+          imageUrl: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal || null,
+          rarity: c.rarity || null,
+          marketPrice: c.prices?.usd ? parseFloat(c.prices.usd) : 0,
+          foilPrice: c.prices?.usd_foil ? parseFloat(c.prices.usd_foil) : null,
+          reversePrice: null, // MTG does not use reverse holofoil
+          game: "mtg",
         });
-        if (!known) {
-          try {
-            await syncGroupProducts(categoryId, grp.groupId);
-            setsSynced.push(grp.name);
-          } catch (err) {
-            console.error(`Failed to sync set ${grp.name}:`, err);
-          }
-        }
       }
-      if (setsSynced.length >= MAX_AUTO_SYNCED_SETS) break;
+    } catch (e) {
+      console.error("Failed MTG Scryfall search:", e);
     }
   }
 
-  const where: Prisma.CardReferenceWhereInput = { game: { in: games } };
+  // Pokemon TCGCSV Search
+  if (games.includes("POKEMON")) {
+    if (set) {
+      const categoryIds = [CATEGORY_IDS.pokemon];
+      for (const categoryId of categoryIds) {
+        const groups = await findGroupsByCode(categoryId, set);
+        for (const grp of groups) {
+          if (setsSynced.length >= MAX_AUTO_SYNCED_SETS) break;
+          const known = await prisma.cardReference.findFirst({
+            where: { groupId: grp.groupId },
+            select: { id: true },
+          });
+          if (!known) {
+            try {
+              await syncGroupProducts(categoryId, grp.groupId);
+              setsSynced.push(grp.name);
+            } catch (err) {
+              console.error(`Failed to sync set ${grp.name}:`, err);
+            }
+          }
+        }
+        if (setsSynced.length >= MAX_AUTO_SYNCED_SETS) break;
+      }
+    }
 
-  const andClauses: Prisma.CardReferenceWhereInput[] = [];
+    const where: any = { game: "POKEMON" };
+    if (set) {
+      where.setCode = { equals: set, mode: "insensitive" };
+    }
+    if (number) {
+      where.number = { equals: number, mode: "insensitive" };
+    }
 
-  if (set) {
-    andClauses.push({
-      OR: [
-        { setCode: { contains: set, mode: "insensitive" } },
-        { setName: { contains: set, mode: "insensitive" } },
-      ],
-    });
-  }
-
-  if (number) {
-    andClauses.push({
-      OR: [
-        { number: number },
-        { number: number.toLowerCase() },
-        // "139" also matches "139/195"
-        { number: { startsWith: `${number}/` } },
-      ],
-    });
-  }
-
-  if (andClauses.length > 0) {
-    where.AND = andClauses;
-  }
-
-  if (name) {
-    where.OR = [
-      { name: { contains: name, mode: "insensitive" } },
-      { cleanName: { contains: name, mode: "insensitive" } },
-    ];
-  }
-
-  let results = await prisma.cardReference.findMany({
-    where,
-    orderBy: [{ marketPrice: "desc" }],
-    take: 60,
-  });
-
-  // Fallback: If 0 results, try matching ANY significant word in the name
-  if (results.length === 0 && name) {
-    const stopWords = new Set(["the", "of", "and", "a", "an", "in", "on", "with", "to", "for"]);
-    const words = name.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
-    
-    if (words.length > 0) {
-      delete where.OR; // remove strict name match
-      
+    if (name) {
+      const words = name.split(" ").filter(w => w.trim().length > 0 && !STOPWORDS.has(w.toLowerCase()));
       const wordClauses = words.map(w => ({
         OR: [
           { name: { contains: w, mode: "insensitive" } },
           { cleanName: { contains: w, mode: "insensitive" } }
         ]
       }));
-      
-      // Require ALL significant words to match (still strict but ignores misspellings in dropped words)
-      // Actually, let's just require ANY word to match, since number/set might narrow it down heavily
-      const currentAnd = Array.isArray(where.AND) ? where.AND : (where.AND ? [where.AND] : []);
-      if (set || number) {
-        where.AND = [...currentAnd, { OR: wordClauses }] as any;
-      } else {
-        where.AND = [...currentAnd, { OR: wordClauses }] as any;
-      }
 
-      results = await prisma.cardReference.findMany({
+      if (wordClauses.length > 0) {
+        if (set || number) {
+          where.AND = wordClauses;
+        } else {
+          where.AND = [
+            {
+              OR: [
+                { name: { contains: name, mode: "insensitive" } },
+                { cleanName: { contains: name, mode: "insensitive" } },
+              ],
+            },
+          ];
+          
+          let exactMatch = await prisma.cardReference.findMany({
+            where,
+            take: 20,
+            orderBy: [{ marketPrice: "desc" }, { name: "asc" }],
+          });
+          
+          if (exactMatch.length === 0) {
+            where.AND = wordClauses;
+          }
+        }
+      }
+    }
+
+    if (Object.keys(where).length > 1) {
+      const results = await prisma.cardReference.findMany({
         where,
-        orderBy: [{ marketPrice: "desc" }],
-        take: 60,
+        take: 30,
+        orderBy: [{ marketPrice: "desc" }, { name: "asc" }],
       });
+      
+      mapped.push(...results.map((c) => ({
+        tcgcsvId: c.tcgcsvId,
+        name: c.name,
+        setName: c.setName,
+        setCode: c.setCode,
+        number: c.number,
+        imageUrl: c.imageUrl,
+        rarity: c.rarity,
+        marketPrice: c.marketPrice,
+        foilPrice: c.foilPrice,
+        reversePrice: c.reversePrice,
+        game: "pokemon",
+      })));
     }
   }
-  const mapped: CatalogCard[] = results.map((c) => ({
-    tcgcsvId: c.tcgcsvId,
-    name: c.name,
-    setName: c.setName,
-    setCode: c.setCode,
-    number: c.number,
-    imageUrl: c.imageUrl,
-    rarity: c.rarity,
-    marketPrice: c.marketPrice,
-    game: c.game === "MTG" ? "mtg" : "pokemon",
-  }));
 
-  return { results: mapped, setsSynced };
+  // Sort combined results by price
+  mapped.sort((a, b) => b.marketPrice - a.marketPrice);
+  
+  return { results: mapped.slice(0, 50), setsSynced };
+
 }
 
 function categoryIdsForGame(game: "pokemon" | "mtg" | "both"): number[] {

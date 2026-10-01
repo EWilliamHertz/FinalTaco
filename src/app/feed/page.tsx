@@ -194,7 +194,7 @@ export default function FeedPage() {
                     width={600}
                     height={800}
                     className="w-full h-auto object-cover transition-transform duration-700 ease-out"
-                    unoptimized
+                   
                   />
                 </div>
               )}

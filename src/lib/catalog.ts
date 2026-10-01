@@ -101,19 +101,22 @@ export async function syncGroupProducts(
 
   const normalPriceByProduct = new Map<number, any>();
   const foilPriceByProduct = new Map<number, any>();
+  const reversePriceByProduct = new Map<number, any>();
 
   for (const p of prices) {
-    const isFoil = p.subTypeName?.toLowerCase().includes("foil") || p.subTypeName?.toLowerCase().includes("holo");
-    if (isFoil) {
-       const prev = foilPriceByProduct.get(p.productId);
-       if (!prev || subtypeRank(p.subTypeName) < subtypeRank(prev.subTypeName)) {
-         foilPriceByProduct.set(p.productId, p);
-       }
+    const sub = p.subTypeName?.toLowerCase() || "";
+    if (sub.includes("reverse")) {
+      reversePriceByProduct.set(p.productId, p);
+    } else if (sub.includes("foil") || sub.includes("holo")) {
+      const prev = foilPriceByProduct.get(p.productId);
+      if (!prev || subtypeRank(p.subTypeName) < subtypeRank(prev.subTypeName)) {
+        foilPriceByProduct.set(p.productId, p);
+      }
     } else {
-       const prev = normalPriceByProduct.get(p.productId);
-       if (!prev || subtypeRank(p.subTypeName) < subtypeRank(prev.subTypeName)) {
-         normalPriceByProduct.set(p.productId, p);
-       }
+      const prev = normalPriceByProduct.get(p.productId);
+      if (!prev || subtypeRank(p.subTypeName) < subtypeRank(prev.subTypeName)) {
+        normalPriceByProduct.set(p.productId, p);
+      }
     }
   }
 
@@ -123,10 +126,12 @@ export async function syncGroupProducts(
     const batch = products.slice(i, i + UPSERT_BATCH);
     await prisma.$transaction(
       batch.map((prod: any) => {
-        const nPrice = normalPriceByProduct.get(prod.productId) || foilPriceByProduct.get(prod.productId);
-        const fPrice = foilPriceByProduct.get(prod.productId) || normalPriceByProduct.get(prod.productId);
+        const nPrice = normalPriceByProduct.get(prod.productId) || foilPriceByProduct.get(prod.productId) || reversePriceByProduct.get(prod.productId);
+        const fPrice = foilPriceByProduct.get(prod.productId);
+        const rPrice = reversePriceByProduct.get(prod.productId);
         const priceVal = nPrice?.marketPrice ?? nPrice?.midPrice ?? nPrice?.lowPrice ?? 0;
         const foilPriceVal = fPrice?.marketPrice ?? fPrice?.midPrice ?? fPrice?.lowPrice ?? null;
+        const reversePriceVal = rPrice?.marketPrice ?? rPrice?.midPrice ?? rPrice?.lowPrice ?? null;
         const ext = (prod.extendedData || []) as {
           name: string;
           value: string;
@@ -139,6 +144,7 @@ export async function syncGroupProducts(
           update: {
             marketPrice: priceVal,
             foilPrice: foilPriceVal,
+            reversePrice: reversePriceVal,
             lowPrice: nPrice?.lowPrice ?? null,
             highPrice: nPrice?.highPrice ?? null,
             groupId,
@@ -158,6 +164,8 @@ export async function syncGroupProducts(
             rarity: findExt("Rarity"),
             subTypeName: nPrice?.subTypeName ?? null,
             marketPrice: priceVal,
+            foilPrice: foilPriceVal,
+            reversePrice: reversePriceVal,
             lowPrice: nPrice?.lowPrice ?? null,
             highPrice: nPrice?.highPrice ?? null,
           },

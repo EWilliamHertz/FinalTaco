@@ -113,7 +113,7 @@ export default function SetDetailsPage() {
               >
                 <div className="relative aspect-[63/88] rounded-xl overflow-hidden bg-neutral-900 border border-white/10">
                   {product.imageUrl ? (
-                    <Image src={product.imageUrl} alt={product.name} fill className="object-cover transition-transform duration-500 group-hover:scale-110" unoptimized />
+                    <Image src={product.imageUrl} alt={product.name} fill className="object-cover transition-transform duration-500 group-hover:scale-110" />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center text-neutral-800 font-serif text-xs">No Image</div>
                   )}

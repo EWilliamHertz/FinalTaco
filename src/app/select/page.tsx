@@ -27,7 +27,7 @@ export default function Home() {
         animate={{ opacity: 1, y: 0 }}
         className="relative z-10 text-center w-full px-4 flex flex-col items-center flex-shrink-0"
       >
-        <div className="relative w-full max-w-[300px] h-[120px] md:h-[150px] mx-auto mb-2">
+        <div className="relative w-full max-w-[300px] h-[120px] md:h-[150px] mx-auto -mb-6 md:-mb-8">
           <Image 
             src="/hatake_logo.png" 
             alt="Hatake.Social Logo" 
@@ -37,10 +37,10 @@ export default function Home() {
             priority
           />
         </div>
-        <p className="font-serif text-2xl tracking-[0.3em] uppercase text-white/70 mt-2">
+        <p className="font-serif text-2xl tracking-[0.3em] uppercase text-white/70 mt-[1.5mm]">
           Hatake.Social
         </p>
-        <p className="font-sans text-[10px] md:text-xs tracking-[0.4em] uppercase text-neutral-600 mt-2">
+        <p className="font-sans text-[10px] md:text-xs tracking-[0.4em] uppercase text-neutral-600 mt-1">
           Select Your Realm
         </p>
       </motion.div>

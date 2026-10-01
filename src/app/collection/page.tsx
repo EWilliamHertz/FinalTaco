@@ -3,8 +3,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { useGameStore } from "@/lib/store";
 import { motion } from "framer-motion";
-import { TrendingUp, Plus, Search, Check, X, Tag, DollarSign } from "lucide-react";
-import { getVault } from "@/app/actions/vault";
+import { TrendingUp, Plus, Search, Check, X, Tag, DollarSign, Trash2 } from "lucide-react";
+import { getVault, removeFromVault } from "@/app/actions/vault";
+import { toast } from "react-toastify";
 import { markForSale, type ListingOverride } from "@/app/actions/market";
 import Image from "next/image";
 import Link from "next/link";
@@ -13,6 +14,8 @@ import { useRouter } from "next/navigation";
 interface VaultCard {
   id: string;
   condition: string;
+  notes: string | null;
+  customPrice: number | null;
   Card: {
     id: string;
     name: string;
@@ -23,6 +26,8 @@ interface VaultCard {
     imageUrl: string | null;
     rarity: string | null;
     marketPrice: number;
+    foilPrice: number | null;
+    reversePrice: number | null;
   };
   Listings: { id: string; price: number }[];
 }
@@ -49,6 +54,7 @@ export default function CollectionPage() {
   const [bulkPercent, setBulkPercent] = useState("100");
   const [cardPricing, setCardPricing] = useState<Record<string, PricingState>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,10 +81,19 @@ export default function CollectionPage() {
     ? cards
     : cards.filter((c) => c.Card.game.toLowerCase() === activeGame);
 
-  const totalValue = displayedCards.reduce((acc, curr) => acc + (curr.Card.marketPrice || 0), 0);
+  const getInstanceValue = (instance: any) => {
+    if (instance.customPrice && instance.customPrice > 0) return instance.customPrice;
+    const isReverse = instance.notes?.includes("Reverse Holo");
+    if (isReverse && instance.Card.reversePrice && instance.Card.reversePrice > 0) return instance.Card.reversePrice;
+    const isFoil = instance.notes?.includes("Foil");
+    if (isFoil && instance.Card.foilPrice && instance.Card.foilPrice > 0) return instance.Card.foilPrice;
+    return instance.Card.marketPrice || 0;
+  };
+
+  const totalValue = displayedCards.reduce((acc, curr) => acc + getInstanceValue(curr), 0);
   const selectedValue = displayedCards
     .filter((c) => selected.has(c.id))
-    .reduce((acc, curr) => acc + (curr.Card.marketPrice || 0), 0);
+    .reduce((acc, curr) => acc + getInstanceValue(curr), 0);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -95,6 +110,22 @@ export default function CollectionPage() {
     } else {
       setSelected(new Set(displayedCards.map((c) => c.id)));
     }
+  };
+
+
+  const handleDelete = async (ids: string[]) => {
+    if (!confirm(`Are you sure you want to remove ${ids.length} item(s) from your vault?`)) return;
+    setDeleting(true);
+    const res = await removeFromVault(ids);
+    if (res.success) {
+      toast.success(`Removed ${ids.length} item(s) from vault`);
+      setSelected(new Set());
+      const res2 = await getVault();
+      if (res2.success && res2.instances) setCards(res2.instances);
+    } else {
+      toast.error(res.error || "Failed to remove items");
+    }
+    setDeleting(false);
   };
 
   const openModal = () => {
@@ -254,6 +285,18 @@ export default function CollectionPage() {
                     </>
                   )}
                 </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => handleDelete(Array.from(selected))}
+                  disabled={selected.size === 0 || deleting}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-sans text-[10px] uppercase tracking-widest transition-all ${
+                    selected.size === 0
+                      ? "border border-white/10 text-neutral-600 cursor-not-allowed"
+                      : "border border-rose-500/30 text-rose-500 hover:bg-rose-500/10"
+                  }`}
+                >
+                  <Trash2 size={12} /> {deleting ? "Removing..." : `Remove (${selected.size})`}
+                </button>
                 <button
                   onClick={openModal}
                   disabled={selected.size === 0}
@@ -265,6 +308,7 @@ export default function CollectionPage() {
                 >
                   <Tag size={12} /> Mark for Sale{selected.size > 0 ? ` (${selected.size})` : ""}
                 </button>
+              </div>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -286,7 +330,7 @@ export default function CollectionPage() {
                     >
                       <div className="relative aspect-[63/88] rounded-lg overflow-hidden bg-black">
                         {instance.Card.imageUrl ? (
-                          <Image src={instance.Card.imageUrl} alt={instance.Card.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />
+                          <Image src={instance.Card.imageUrl} alt={instance.Card.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-neutral-800 font-serif text-xs">No Image</div>
                         )}
@@ -301,6 +345,17 @@ export default function CollectionPage() {
                             <span className="w-full h-full bg-black/60 border border-white/30" />
                           )}
                         </div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete([instance.id]);
+                          }}
+                          disabled={deleting}
+                          className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-black/80 border border-white/20 flex items-center justify-center text-neutral-400 hover:text-rose-500 hover:border-rose-500/50 hover:bg-rose-500/10 transition-colors z-10 opacity-0 group-hover:opacity-100 disabled:opacity-50 shadow-xl backdrop-blur-sm"
+                        >
+                          <Trash2 size={12} />
+                        </button>
                         {activeListing && (
                           <div className="absolute top-2 right-2 bg-emerald-500/90 text-black px-2 py-0.5 rounded text-[8px] font-sans font-bold uppercase tracking-widest">
                             ${activeListing.price.toFixed(2)}
@@ -318,8 +373,13 @@ export default function CollectionPage() {
                           <p className="font-sans text-[9px] uppercase tracking-widest text-neutral-500 truncate mr-2">
                             {instance.Card.setCode ? `${instance.Card.setCode} · ` : ""}{instance.Card.number ? `#${instance.Card.number}` : instance.Card.setName}
                           </p>
-                          {instance.Card.marketPrice > 0 && (
-                            <p className={`font-serif text-xs ${brandColor}`}>${instance.Card.marketPrice.toFixed(2)}</p>
+                          {getInstanceValue(instance) > 0 && (
+                            <div className="flex flex-col items-end">
+                              <p className={`font-serif text-xs ${brandColor}`}>${getInstanceValue(instance).toFixed(2)}</p>
+                              {instance.notes?.includes("Reverse Holo") && !instance.customPrice && instance.Card.reversePrice && <span className="text-[7px] uppercase tracking-widest text-purple-400">Reverse</span>}
+                              {instance.notes?.includes("Foil") && !instance.customPrice && instance.Card.foilPrice && <span className="text-[7px] uppercase tracking-widest text-blue-400">Foil</span>}
+                              {instance.customPrice && <span className="text-[7px] uppercase tracking-widest text-emerald-400">Custom</span>}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -345,11 +405,11 @@ export default function CollectionPage() {
               {displayedCards.slice(0, 4).map((instance) => (
                 <div key={instance.id} className="flex items-center gap-3">
                   <div className="w-10 h-14 bg-black rounded shrink-0 relative overflow-hidden border border-white/10">
-                    {instance.Card.imageUrl && <Image src={instance.Card.imageUrl} alt={instance.Card.name} fill className="object-cover" unoptimized />}
+                    {instance.Card.imageUrl && <Image src={instance.Card.imageUrl} alt={instance.Card.name} fill className="object-cover" />}
                   </div>
                   <div className="min-w-0">
                     <h4 className="font-serif text-white text-xs truncate">{instance.Card.name}</h4>
-                    <p className={`font-serif text-[10px] ${brandColor}`}>${instance.Card.marketPrice?.toFixed(2) || "0.00"}</p>
+                    <p className={`font-serif text-[10px] ${brandColor}`}>${getInstanceValue(instance).toFixed(2) || "0.00"}</p>
                   </div>
                 </div>
               ))}
@@ -431,7 +491,7 @@ export default function CollectionPage() {
                       }`}
                     >
                       <div className="w-9 h-12 relative rounded overflow-hidden bg-black border border-white/10 shrink-0">
-                        {card.Card.imageUrl && <Image src={card.Card.imageUrl} alt={card.Card.name} fill className="object-cover" unoptimized />}
+                        {card.Card.imageUrl && <Image src={card.Card.imageUrl} alt={card.Card.name} fill className="object-cover" />}
                       </div>
                       <div className="min-w-0 flex-1">
                         <h4 className="font-serif text-sm text-white truncate">{card.Card.name}</h4>

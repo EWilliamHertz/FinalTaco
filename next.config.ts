@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
     '3000-cs-553118797525-default.cs-europe-west4-pear.cloudshell.dev',
     'localhost:3000'
   ],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**",
+      }
+    ]
+  }
 };
 
 export default nextConfig;

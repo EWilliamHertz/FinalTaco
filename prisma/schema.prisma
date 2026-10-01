@@ -49,6 +49,7 @@ model CardReference {
   subTypeName  String? // Normal / Holofoil / Reverse Holofoil
   marketPrice  Float          @default(0.0)
   foilPrice    Float?
+  reversePrice Float?
   lowPrice     Float?
   highPrice    Float?
 

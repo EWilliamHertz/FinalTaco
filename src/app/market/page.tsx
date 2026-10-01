@@ -113,7 +113,7 @@ export default function MarketPage() {
                 <div className="col-span-1 md:col-span-5 flex items-center gap-6">
                   <div className={`relative w-16 h-20 overflow-hidden border border-white/10 shrink-0 ${isPokemon ? "hover:border-yellow-400/30" : "hover:border-orange-500/30"}`}>
                     {item.CardInstance.Card.imageUrl ? (
-                      <Image src={item.CardInstance.Card.imageUrl} alt={item.CardInstance.Card.name} fill className="object-cover group-hover:scale-110 transition-transform duration-700 grayscale group-hover:grayscale-0" unoptimized />
+                      <Image src={item.CardInstance.Card.imageUrl} alt={item.CardInstance.Card.name} fill className="object-cover group-hover:scale-110 transition-transform duration-700 grayscale group-hover:grayscale-0" />
                     ) : (
                       <div className="w-full h-full bg-neutral-900 flex items-center justify-center">No Img</div>
                     )}

@@ -32,6 +32,7 @@ function SearchPage() {
   const [vaultCondition, setVaultCondition] = useState("NEAR_MINT");
   const [vaultNotes, setVaultNotes] = useState("");
   const [isFoil, setIsFoil] = useState(false);
+  const [isReverse, setIsReverse] = useState(false);
   const [isSigned, setIsSigned] = useState(false);
   const [customPrice, setCustomPrice] = useState("");
   const [isSubmittingVault, setIsSubmittingVault] = useState(false);
@@ -113,6 +114,7 @@ function SearchPage() {
     setVaultCondition("NEAR_MINT");
     setVaultNotes("");
     setIsFoil(false);
+    setIsReverse(false);
     setIsSigned(false);
     setCustomPrice("");
   };
@@ -131,11 +133,13 @@ function SearchPage() {
       imageUrl: selectedCard.imageUrl || "",
       rarity: selectedCard.rarity || undefined,
       marketPrice: selectedCard.marketPrice,
+      foilPrice: selectedCard.foilPrice,
+      reversePrice: selectedCard.reversePrice,
       setCode: selectedCard.setCode || undefined,
       number: selectedCard.number || undefined,
       condition: vaultCondition,
       quantity: vaultQuantity,
-      notes: [isFoil ? "Foil" : "", isSigned ? "Signed" : "", vaultNotes].filter(Boolean).join(", "),
+      notes: [isFoil ? "Foil" : "", isReverse ? "Reverse Holo" : "", isSigned ? "Signed" : "", vaultNotes].filter(Boolean).join(", "),
       customPrice: customPrice ? parseFloat(customPrice) : undefined
     });
 
@@ -213,7 +217,7 @@ function SearchPage() {
                 >
                   <div className="relative aspect-[63/88] rounded-xl overflow-hidden border border-white/10 group-hover:border-white/30 transition-colors mb-3">
                     {card.imageUrl ? (
-                      <Image src={card.imageUrl} alt={card.name} fill className="object-cover" unoptimized />
+                      <Image src={card.imageUrl} alt={card.name} fill className="object-cover" />
                     ) : (
                       <div className="w-full h-full bg-neutral-900 flex items-center justify-center text-neutral-500 font-serif text-xs">No Image</div>
                     )}
@@ -255,7 +259,17 @@ function SearchPage() {
               &times;
             </button>
             <h2 className="font-serif text-2xl text-white mb-2 truncate">{selectedCard.name}</h2>
-            <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-400 mb-6">{selectedCard.setName}</p>
+            <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-400 mb-2">{selectedCard.setName}</p>
+            <div className="mb-6 font-serif text-lg text-emerald-400">
+              {customPrice 
+                ? `$${parseFloat(customPrice).toFixed(2)}` 
+                : isReverse && selectedCard.reversePrice && selectedCard.reversePrice > 0
+                  ? `$${selectedCard.reversePrice.toFixed(2)}`
+                  : isFoil && selectedCard.foilPrice && selectedCard.foilPrice > 0
+                    ? `$${selectedCard.foilPrice.toFixed(2)}`
+                    : `$${selectedCard.marketPrice.toFixed(2)}`
+              }
+            </div>
             
             <div className="space-y-4">
               <div>
@@ -288,20 +302,35 @@ function SearchPage() {
 
               
               
-              <div className="flex gap-4">
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsFoil(!isFoil)}
-                  className={`flex-1 py-2 rounded-lg font-sans text-[10px] uppercase tracking-widest border transition-colors ${isFoil ? 'bg-white text-black border-white' : 'bg-black/50 text-neutral-400 border-white/10 hover:border-white/30'}`}
+                  onClick={() => { setIsFoil(!isFoil); setIsReverse(false); }}
+                  className={`flex-1 py-2 flex flex-col items-center justify-center rounded-lg font-sans text-[10px] uppercase tracking-widest border transition-colors ${isFoil ? 'bg-white text-black border-white' : 'bg-black/50 text-neutral-400 border-white/10 hover:border-white/30'}`}
                 >
-                  Foil
+                  <span>Foil</span>
+                  {selectedCard.foilPrice && selectedCard.foilPrice > 0 ? (
+                    <span className={`text-[8px] mt-0.5 ${isFoil ? 'text-black/60' : 'text-blue-400'}`}>${selectedCard.foilPrice.toFixed(2)}</span>
+                  ) : null}
                 </button>
+                {selectedCard.game === "pokemon" && (
+                  <button
+                    type="button"
+                    onClick={() => { setIsReverse(!isReverse); setIsFoil(false); }}
+                    className={`flex-1 py-2 flex flex-col items-center justify-center rounded-lg font-sans text-[10px] uppercase tracking-widest border transition-colors ${isReverse ? 'bg-white text-black border-white' : 'bg-black/50 text-neutral-400 border-white/10 hover:border-white/30'}`}
+                  >
+                    <span>Reverse</span>
+                    {selectedCard.reversePrice && selectedCard.reversePrice > 0 ? (
+                      <span className={`text-[8px] mt-0.5 ${isReverse ? 'text-black/60' : 'text-purple-400'}`}>${selectedCard.reversePrice.toFixed(2)}</span>
+                    ) : null}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsSigned(!isSigned)}
-                  className={`flex-1 py-2 rounded-lg font-sans text-[10px] uppercase tracking-widest border transition-colors ${isSigned ? 'bg-white text-black border-white' : 'bg-black/50 text-neutral-400 border-white/10 hover:border-white/30'}`}
+                  className={`flex-1 py-2 flex flex-col items-center justify-center rounded-lg font-sans text-[10px] uppercase tracking-widest border transition-colors ${isSigned ? 'bg-white text-black border-white' : 'bg-black/50 text-neutral-400 border-white/10 hover:border-white/30'}`}
                 >
-                  Signed
+                  <span>Signed</span>
                 </button>
               </div>
 

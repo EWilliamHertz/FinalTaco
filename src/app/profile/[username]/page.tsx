@@ -7,8 +7,9 @@ import ProfileVaultClient from "./ProfileVaultClient";
 import FollowButton from "./FollowButton";
 import { prisma } from "@/lib/db";
 
-export default async function ProfilePage({ params }: { params: { username: string } }) {
-  const profile = await getUserProfile(params.username);
+export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
+  const resolvedParams = await params;
+  const profile = await getUserProfile(resolvedParams.username);
   if (!profile) {
     return notFound();
   }
@@ -90,7 +91,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
                       alt="Post image"
                       fill
                       className="object-cover"
-                      unoptimized
+                     
                     />
                   </div>
                 )}
