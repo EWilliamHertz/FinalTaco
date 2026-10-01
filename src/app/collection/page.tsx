@@ -280,16 +280,7 @@ export default function CollectionPage() {
           </div>
         </div>
 
-        <div className="flex gap-12 font-serif">
-          <div className="flex flex-col">
-            <span className="text-3xl text-white">{displayedCards.length}</span>
-            <span className="text-xs text-neutral-500 uppercase tracking-widest font-sans">Cards</span>
-          </div>
-          <div className="flex flex-col">
-            <span className={`text-3xl ${brandColor}`}>${totalValue.toFixed(2)}</span>
-            <span className="text-xs text-neutral-500 uppercase tracking-widest font-sans">Est. Value</span>
-          </div>
-        </div>
+        
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -603,7 +594,7 @@ export default function CollectionPage() {
               <h3 className="font-serif text-white text-lg">Market Pulse</h3>
             </div>
 
-            {cards.length < 50 ? (
+            {cards.length < 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center opacity-50 text-center px-4">
                 <Lock className="w-8 h-8 text-neutral-500 mb-3" />
                 <p className="font-sans text-[10px] uppercase tracking-[0.2em] text-neutral-400">Unlock at 50 Cards</p>

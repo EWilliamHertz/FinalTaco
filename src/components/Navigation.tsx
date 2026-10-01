@@ -290,6 +290,10 @@ export function Navigation() {
               <Link href="/database" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors md:hidden">Database</Link>
               <Link href="/trades" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors text-purple-400">Trade Center</Link>
               <Link href="/market" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">Market</Link>
+              <Link href="/messages" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors text-blue-400">Messages</Link>
+              <Link href="/groups" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors text-pink-400">Groups</Link>
+              <Link href="/auctions" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors text-orange-400">Auctions</Link>
+              <Link href="/leaderboard" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors text-yellow-400">Leaderboard</Link>
               <Link href="/collection" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">Collection</Link>
               {user && <Link href={`/profile/${user.username}`} onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">My Profile</Link>}
               <Link href="/binders" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors md:hidden">Decks</Link>

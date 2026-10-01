@@ -40,6 +40,8 @@ model User {
   CreatedGroups    CommunityGroup[]    @relation("GroupCreator")
   GroupMemberships GroupMember[]
   Badges           UserBadge[]
+  Auction          Auction[]
+  AuctionBid       AuctionBid[]
 }
 
 model CardReference {
@@ -93,6 +95,7 @@ model CardInstance {
   Card       CardReference   @relation(fields: [cardId], references: [id], onDelete: Cascade)
   Listings   MarketListing[]
   TradeItems TradeItem[]
+  Auction    Auction[]
 
   @@index([ownerId])
 }
@@ -332,4 +335,37 @@ model UserBadge {
   Badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, badgeId])
+}
+
+model Auction {
+  id             String        @id @default(uuid())
+  sellerId       String
+  cardInstanceId String
+  startingPrice  Float
+  currentPrice   Float
+  buyItNowPrice  Float?
+  endTime        DateTime
+  status         AuctionStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now())
+
+  Seller       User         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  CardInstance CardInstance @relation(fields: [cardInstanceId], references: [id], onDelete: Cascade)
+  Bids         AuctionBid[]
+}
+
+model AuctionBid {
+  id        String   @id @default(uuid())
+  auctionId String
+  bidderId  String
+  amount    Float
+  createdAt DateTime @default(now())
+
+  Auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  Bidder  User    @relation(fields: [bidderId], references: [id], onDelete: Cascade)
+}
+
+enum AuctionStatus {
+  ACTIVE
+  ENDED
+  CANCELLED
 }
