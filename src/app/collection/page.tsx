@@ -167,7 +167,7 @@ export default function CollectionPage() {
 
   
 
-  const totalValue = displayedCards.reduce((acc, curr) => acc + getInstanceValue(curr), 0);
+  const totalValue = cards.reduce((acc, curr) => acc + getInstanceValue(curr), 0);
   const selectedValue = displayedCards
     .filter((c) => selected.has(c.id))
     .reduce((acc, curr) => acc + getInstanceValue(curr), 0);
@@ -615,19 +615,19 @@ export default function CollectionPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-sm">
                     <span className="font-sans text-xs text-neutral-400">Total Cards</span>
-                    <span className="font-serif text-white">{displayedCards.length}</span>
+                    <span className="font-serif text-white">{cards.length}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="font-sans text-xs text-neutral-400">Unique Cards</span>
-                    <span className="font-serif text-white">{new Set(displayedCards.map(c => c.Card.id)).size}</span>
+                    <span className="font-serif text-white">{new Set(cards.map((c: any) => c.Card.id)).size}</span>
                   </div>
                 </div>
 
-                {displayedCards.length > 0 && (
+                {cards.length > 0 && (
                   <div className="pt-4 border-t border-white/5">
                     <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-3">Top Asset</p>
                     {(() => {
-                      const topCard = [...displayedCards].sort((a, b) => getInstanceValue(b) - getInstanceValue(a))[0];
+                      const topCard = [...cards].sort((a, b) => getInstanceValue(b) - getInstanceValue(a))[0];
                       return topCard ? (
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-14 bg-black rounded shrink-0 relative overflow-hidden border border-white/10">

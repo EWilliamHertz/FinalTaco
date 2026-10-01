@@ -140,14 +140,16 @@ export async function getVaultStats() {
     
     const instances = await prisma.cardInstance.findMany({
       where: { ownerId: userId },
-      include: { Card: { select: { marketPrice: true, foilPrice: true } } }
+      include: { Card: { select: { marketPrice: true, foilPrice: true, reversePrice: true } } }
     });
     
     const count = instances.length;
     const value = instances.reduce((acc, inst) => {
-      if (inst.customPrice !== null) return acc + inst.customPrice;
-      const isFoil = inst.notes?.toLowerCase().includes("foil") || inst.notes?.toLowerCase().includes("holo");
-      if (isFoil && inst.Card.foilPrice) return acc + inst.Card.foilPrice;
+      if (inst.customPrice && inst.customPrice > 0) return acc + inst.customPrice;
+      const isReverse = inst.notes?.includes("Reverse Holo");
+      if (isReverse && inst.Card.reversePrice && inst.Card.reversePrice > 0) return acc + inst.Card.reversePrice;
+      const isFoil = inst.notes?.includes("Foil");
+      if (isFoil && inst.Card.foilPrice && inst.Card.foilPrice > 0) return acc + inst.Card.foilPrice;
       return acc + (inst.Card.marketPrice || 0);
     }, 0);
     return { count, value };
