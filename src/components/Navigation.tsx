@@ -288,8 +288,10 @@ export function Navigation() {
             <div className="flex flex-col gap-2 font-serif text-neutral-300">
               <Link href="/feed" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors md:hidden">Feed</Link>
               <Link href="/database" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors md:hidden">Database</Link>
+              <Link href="/trades" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors text-purple-400">Trade Center</Link>
               <Link href="/market" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">Market</Link>
               <Link href="/collection" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">Collection</Link>
+              {user && <Link href={`/profile/${user.username}`} onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">My Profile</Link>}
               <Link href="/binders" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors md:hidden">Decks</Link>
               <Link href="/settings" onClick={() => setSidebarOpen(false)} className="p-3 hover:bg-white/5 rounded-lg transition-colors">Account Settings</Link>
             </div>
