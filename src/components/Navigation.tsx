@@ -54,7 +54,7 @@ export function Navigation() {
     }
   }, [isSidebarOpen]);
 
-  if (!activeGame && (pathname === "/" || pathname === "/select")) return null;
+  if (pathname === "/" || pathname === "/select") return null;
 
   const brandColor = activeGame === "pokemon" ? "text-yellow-400" : activeGame === "mtg" ? "text-orange-500" : "text-emerald-400";
   const brandBg = activeGame === "pokemon" ? "bg-yellow-400" : activeGame === "mtg" ? "bg-orange-500" : "bg-emerald-400";
@@ -185,7 +185,7 @@ export function Navigation() {
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   if (searchUser) {
-                    window.location.href = `/search?user=${encodeURIComponent(searchUser)}`;
+                    window.location.href = `/profile/${encodeURIComponent(searchUser)}`;
                   }
                 }} className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1">

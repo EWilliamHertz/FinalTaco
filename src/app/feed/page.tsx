@@ -150,7 +150,7 @@ export default function FeedPage() {
             >
 
               {currentUser && (currentUser.id === post.authorId || currentUser.role === "ADMIN") && (
-                <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <div className="absolute top-4 right-4 flex items-center gap-2 opacity-90 hover:opacity-100 transition-opacity z-10">
                   <button onClick={() => {
                     setEditingPostId(post.id);
                     setEditContent(post.content);

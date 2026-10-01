@@ -7,6 +7,7 @@ import { Search, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import Image from "next/image";
 import { getMarketplaceListings } from "@/app/actions/market";
 import Link from "next/link";
+import { proxiedImage } from "@/lib/images";
 
 export default function MarketPage() {
   const activeGame = useGameStore((state) => state.activeGame);
@@ -113,7 +114,7 @@ export default function MarketPage() {
                 <div className="col-span-1 md:col-span-5 flex items-center gap-6">
                   <div className={`relative w-16 h-20 overflow-hidden border border-white/10 shrink-0 ${isPokemon ? "hover:border-yellow-400/30" : "hover:border-orange-500/30"}`}>
                     {item.CardInstance.Card.imageUrl ? (
-                      <Image src={item.CardInstance.Card.imageUrl} alt={item.CardInstance.Card.name} fill className="object-cover group-hover:scale-110 transition-transform duration-700 grayscale group-hover:grayscale-0" />
+                      <Image src={proxiedImage(item.CardInstance.Card.imageUrl)!} alt={item.CardInstance.Card.name} fill className="object-cover group-hover:scale-110 transition-transform duration-700 grayscale group-hover:grayscale-0" unoptimized />
                     ) : (
                       <div className="w-full h-full bg-neutral-900 flex items-center justify-center">No Img</div>
                     )}

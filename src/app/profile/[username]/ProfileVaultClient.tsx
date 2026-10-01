@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { getUserVault } from "@/app/actions/user";
+import { proxiedImage } from "@/lib/images";
 
 export default function ProfileVaultClient({ username }: { username: string }) {
   const [vault, setVault] = useState<any[]>([]);
@@ -96,7 +97,7 @@ export default function ProfileVaultClient({ username }: { username: string }) {
             <div key={instance.id} className="group relative">
               <div className="relative aspect-[63/88] rounded-xl overflow-hidden border border-white/10 mb-3">
                 {instance.Card.imageUrl ? (
-                  <Image src={instance.Card.imageUrl} alt={instance.Card.name} fill className="object-cover" />
+                  <Image src={proxiedImage(instance.Card.imageUrl)!} alt={instance.Card.name} fill className="object-cover" unoptimized />
                 ) : (
                   <div className="w-full h-full bg-neutral-900 flex items-center justify-center text-neutral-500 font-serif text-xs">No Image</div>
                 )}

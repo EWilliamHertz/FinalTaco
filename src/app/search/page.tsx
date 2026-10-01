@@ -3,11 +3,12 @@ import { toast } from "react-toastify";
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useGameStore } from "@/lib/store";
-import { useEffect, useState, Suspense, useCallback } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Plus, RefreshCw, Check, CloudDownload } from "lucide-react";
-import { searchCatalog, getCatalogStatus, startCatalogSync, type CatalogCard } from "@/app/actions/search";
+import { Search } from "lucide-react";
+import { searchCatalog, type CatalogCard } from "@/app/actions/search";
+import { proxiedImage } from "@/lib/images";
 import { addToVault } from "@/app/actions/vault";
 
 function SearchPage() {
@@ -22,9 +23,13 @@ function SearchPage() {
   const brandColor = activeGame === "pokemon" ? "text-yellow-400" : activeGame === "mtg" ? "text-orange-500" : "text-emerald-400";
 
   const [results, setResults] = useState<CatalogCard[]>([]);
-  const [setsSynced, setSetsSynced] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
+
+  // Inline search form state (kept in sync with the URL params)
+  const [formName, setFormName] = useState(name);
+  const [formSet, setFormSet] = useState(set);
+  const [formNumber, setFormNumber] = useState(number);
   
   // Vault Modal State
   const [selectedCard, setSelectedCard] = useState<CatalogCard | null>(null);
@@ -37,19 +42,18 @@ function SearchPage() {
   const [customPrice, setCustomPrice] = useState("");
   const [isSubmittingVault, setIsSubmittingVault] = useState(false);
   const [added, setAdded] = useState<Record<string, boolean>>({});
-  const [catalog, setCatalog] = useState<{ groups: number; cards: number; syncedGroups: number; groupsError?: string | null; sync: { running: boolean; done: number; total: number; currentGroup: string | null } } | null>(null);
-  const [syncing, setSyncing] = useState(false);
 
+  // Keep the inline form in sync when the URL changes
   useEffect(() => {
-    if (user) return;
-    getCatalogStatus(activeGame ?? "both")
-      .then(setCatalog)
-      .catch((err) => {
-        console.error("Catalog status failed:", err);
-        // Still show the banner so the sync button is reachable
-        setCatalog({ groups: 0, cards: 0, syncedGroups: 0, groupsError: "status unavailable", sync: { running: false, done: 0, total: 0, currentGroup: null } });
-      });
-  }, [user, activeGame]);
+    setFormName(name);
+    setFormSet(set);
+    setFormNumber(number);
+  }, [name, set, number]);
+
+  // Send /search?user=... straight to that collector's profile
+  useEffect(() => {
+    if (user) router.replace(`/profile/${encodeURIComponent(user)}`);
+  }, [user, router]);
 
   useEffect(() => {
     async function performSearch() {
@@ -65,7 +69,6 @@ function SearchPage() {
           game: activeGame ?? "both",
         });
         setResults(res.results);
-        setSetsSynced(res.setsSynced);
       } catch (err) {
         console.error(err);
       }
@@ -74,35 +77,6 @@ function SearchPage() {
 
     performSearch();
   }, [name, set, number, user, activeGame]);
-
-  const handleFullSync = useCallback(async () => {
-    setSyncing(true);
-    try {
-      await startCatalogSync(activeGame ?? "both");
-      // Poll progress until done
-      const poll = setInterval(async () => {
-        const status = await getCatalogStatus(activeGame ?? "both");
-        setCatalog(status);
-        if (!status.sync.running) {
-          clearInterval(poll);
-          setSyncing(false);
-          // Re-run the current search now that more data exists
-          if (name || set || number) {
-            const res = await searchCatalog({
-              name: name || undefined,
-              set: set || undefined,
-              number: number || undefined,
-              game: activeGame ?? "both",
-            });
-            setResults(res.results);
-          }
-        }
-      }, 3000);
-    } catch (err) {
-      console.error(err);
-      setSyncing(false);
-    }
-  }, [activeGame, name, set, number]);
 
   const openAddModal = (card: CatalogCard) => {
     if (added[card.tcgcsvId]) {
@@ -154,8 +128,6 @@ function SearchPage() {
     setIsSubmittingVault(false);
   };
 
-  const syncPct = catalog && catalog.groups > 0 ? Math.round((catalog.syncedGroups / catalog.groups) * 100) : 0;
-
   return (
     <main className="min-h-screen pt-32 pb-20 px-6 lg:px-12 max-w-[1400px] mx-auto">
       <div className="mb-16 border-b border-white/10 pb-8">
@@ -168,42 +140,60 @@ function SearchPage() {
       </div>
 
       {user ? (
-        <div className="py-20 text-center flex flex-col items-center justify-center opacity-50">
-          <p className="font-serif text-2xl text-neutral-400 mb-2">User Indexing</p>
-          <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-500">
-            User search will be available shortly.
-          </p>
-        </div>
+        <div className="py-20 text-center font-serif italic text-neutral-500">Taking you to @{user}...</div>
       ) : (
         <>
-          {/* Catalog status / full sync banner */}
-          {catalog && (
-            <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-neutral-900/40 border border-white/5 rounded-xl px-6 py-4">
-              <div className="font-sans text-[10px] uppercase tracking-widest text-neutral-400">
-                {catalog.groupsError && catalog.groups === 0 ? (
-                  <span className="text-rose-400">Catalog status unavailable (TCGCSV unreachable?)</span>
-                ) : (
-                  <>
-                    Catalog: <span className="text-white">{catalog.cards.toLocaleString()}</span> cards from{" "}
-                    <span className="text-white">{catalog.syncedGroups}</span>/{catalog.groups} sets ({syncPct}%)
-                    {setsSynced.length > 0 && (
-                      <span className={brandColor}> · just synced: {setsSynced.join(", ")}</span>
-                    )}
-                  </>
-                )}
+          {/* Inline search form so you can refine without leaving the page */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const params = new URLSearchParams();
+              if (formName.trim()) params.set("name", formName.trim());
+              if (formSet.trim()) params.set("set", formSet.trim());
+              if (formNumber.trim()) params.set("number", formNumber.trim());
+              router.push(`/search?${params.toString()}`);
+            }}
+            className="mb-12 bg-neutral-900/40 border border-white/5 rounded-xl p-6 flex flex-col gap-4"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_140px_140px_auto] gap-4 items-end">
+              <div>
+                <label className="block font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-2">Card Name</label>
+                <input
+                  type="text"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="e.g. Charizard or Fire // Ice"
+                  className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/30 transition-colors font-serif"
+                />
+              </div>
+              <div>
+                <label className="block font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-2">Set Code</label>
+                <input
+                  type="text"
+                  value={formSet}
+                  onChange={(e) => setFormSet(e.target.value)}
+                  placeholder="e.g. PAF"
+                  className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/30 transition-colors font-serif"
+                />
+              </div>
+              <div>
+                <label className="block font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-2">Collector #</label>
+                <input
+                  type="text"
+                  value={formNumber}
+                  onChange={(e) => setFormNumber(e.target.value)}
+                  placeholder="e.g. 234"
+                  className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/30 transition-colors font-serif"
+                />
               </div>
               <button
-                onClick={handleFullSync}
-                disabled={syncing}
-                className="flex items-center gap-2 px-5 py-2 border border-white/10 rounded-lg font-sans text-[10px] uppercase tracking-widest text-neutral-300 hover:text-white hover:border-white/30 transition-colors disabled:opacity-50 shrink-0"
+                type="submit"
+                className="px-8 py-3 bg-white text-black hover:bg-neutral-200 transition-colors rounded-lg font-sans text-xs uppercase tracking-widest h-[46px] flex items-center justify-center gap-2"
               >
-                {syncing ? <RefreshCw size={12} className="animate-spin" /> : <CloudDownload size={12} />}
-                {syncing
-                  ? `Syncing${catalog.sync.currentGroup ? `: ${catalog.sync.currentGroup}` : ""} ${catalog.sync.total > 0 ? `(${catalog.sync.done}/${catalog.sync.total})` : ""}`
-                  : "Sync full catalog"}
+                <Search size={14} /> Search
               </button>
             </div>
-          )}
+          </form>
 
           {loading ? (
             <div className="text-center text-neutral-500 font-serif italic py-12">Scouring the archives...</div>
@@ -217,7 +207,7 @@ function SearchPage() {
                 >
                   <div className="relative aspect-[63/88] rounded-xl overflow-hidden border border-white/10 group-hover:border-white/30 transition-colors mb-3">
                     {card.imageUrl ? (
-                      <Image src={card.imageUrl} alt={card.name} fill className="object-cover" />
+                      <Image src={proxiedImage(card.imageUrl)!} alt={card.name} fill className="object-cover" unoptimized />
                     ) : (
                       <div className="w-full h-full bg-neutral-900 flex items-center justify-center text-neutral-500 font-serif text-xs">No Image</div>
                     )}
@@ -238,11 +228,7 @@ function SearchPage() {
             <div className="py-20 text-center flex flex-col items-center justify-center opacity-50">
               <p className="font-serif text-2xl text-neutral-400 mb-2">No Results Found</p>
               <p className="font-sans text-[10px] uppercase tracking-widest text-neutral-500 mb-6 max-w-md leading-relaxed">
-                {catalog && catalog.cards === 0
-                  ? "The card catalog is empty — enter a set code (e.g. OTP, PAF, SWSH12) to pull that set from TCGCSV, or sync the full catalog above."
-                  : catalog && catalog.syncedGroups < catalog.groups
-                    ? "Only a few sets are ingested so far. Try a set code, or sync the full catalog above to search by name across everything."
-                    : "Try adjusting your search parameters."}
+                Try adjusting your search parameters.
               </p>
               <Link href="/database" className="font-sans text-[10px] uppercase tracking-widest text-neutral-400 border-b border-white/20 pb-1">
                 Browse by set instead

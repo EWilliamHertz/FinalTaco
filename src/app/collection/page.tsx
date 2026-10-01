@@ -10,6 +10,7 @@ import { markForSale, type ListingOverride } from "@/app/actions/market";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { proxiedImage } from "@/lib/images";
 
 interface VaultCard {
   id: string;
@@ -330,7 +331,7 @@ export default function CollectionPage() {
                     >
                       <div className="relative aspect-[63/88] rounded-lg overflow-hidden bg-black">
                         {instance.Card.imageUrl ? (
-                          <Image src={instance.Card.imageUrl} alt={instance.Card.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                          <Image src={proxiedImage(instance.Card.imageUrl)!} alt={instance.Card.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-neutral-800 font-serif text-xs">No Image</div>
                         )}
@@ -405,7 +406,7 @@ export default function CollectionPage() {
               {displayedCards.slice(0, 4).map((instance) => (
                 <div key={instance.id} className="flex items-center gap-3">
                   <div className="w-10 h-14 bg-black rounded shrink-0 relative overflow-hidden border border-white/10">
-                    {instance.Card.imageUrl && <Image src={instance.Card.imageUrl} alt={instance.Card.name} fill className="object-cover" />}
+                    {instance.Card.imageUrl && <Image src={proxiedImage(instance.Card.imageUrl)!} alt={instance.Card.name} fill className="object-cover" unoptimized />}
                   </div>
                   <div className="min-w-0">
                     <h4 className="font-serif text-white text-xs truncate">{instance.Card.name}</h4>
@@ -491,7 +492,7 @@ export default function CollectionPage() {
                       }`}
                     >
                       <div className="w-9 h-12 relative rounded overflow-hidden bg-black border border-white/10 shrink-0">
-                        {card.Card.imageUrl && <Image src={card.Card.imageUrl} alt={card.Card.name} fill className="object-cover" />}
+                        {card.Card.imageUrl && <Image src={proxiedImage(card.Card.imageUrl)!} alt={card.Card.name} fill className="object-cover" unoptimized />}
                       </div>
                       <div className="min-w-0 flex-1">
                         <h4 className="font-serif text-sm text-white truncate">{card.Card.name}</h4>

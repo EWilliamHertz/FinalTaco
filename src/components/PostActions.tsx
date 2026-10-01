@@ -19,7 +19,7 @@ export function PostActions({ postId, authorId, initialContent }: { postId: stri
 
   return (
     <>
-      <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+      <div className="absolute top-4 right-4 flex items-center gap-2 opacity-90 hover:opacity-100 transition-opacity z-10">
         <button onClick={() => setIsEditing(true)} className="p-1.5 bg-black/50 hover:bg-white text-neutral-400 hover:text-black rounded transition-colors backdrop-blur-md border border-white/10">
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
         </button>
