@@ -20,11 +20,14 @@ function SearchPage() {
   const set = searchParams.get("set") || "";
   const number = searchParams.get("number") || "";
   const user = searchParams.get("user") || "";
+  const pageParam = searchParams.get("page");
+  const page = pageParam ? parseInt(pageParam) : 1;
 
   const activeGame = useGameStore((state) => state.activeGame);
   const brandColor = activeGame === "pokemon" ? "text-yellow-400" : activeGame === "mtg" ? "text-orange-500" : "text-emerald-400";
 
   const [results, setResults] = useState<CatalogCard[]>([]);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
 
@@ -93,8 +96,10 @@ function SearchPage() {
           set: set || undefined,
           number: number || undefined,
           game: activeGame ?? "both",
+          page,
         });
         setResults(res.results);
+        setHasMore(res.hasMore);
       } catch (err) {
         console.error(err);
       }
@@ -102,7 +107,7 @@ function SearchPage() {
     }
 
     performSearch();
-  }, [name, set, number, user, activeGame]);
+  }, [name, set, number, user, activeGame, page]);
 
   const openAddModal = (card: CatalogCard) => {
     if (added[card.tcgcsvId]) {
@@ -320,7 +325,35 @@ function SearchPage() {
                   </p>
                 </div>
               ))}
-                            </div>
+                </div>
+                {/* Pagination Controls */}
+                <div className="flex justify-center gap-4 mt-12">
+                  <button
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.set("page", String(page - 1));
+                      router.push(`/search?${params.toString()}`);
+                    }}
+                    disabled={page <= 1}
+                    className="px-6 py-2 bg-neutral-900/80 border border-white/10 rounded-lg text-white font-sans text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="flex items-center text-neutral-400 font-sans text-xs uppercase tracking-widest">
+                    Page {page}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.set("page", String(page + 1));
+                      router.push(`/search?${params.toString()}`);
+                    }}
+                    disabled={!hasMore}
+                    className="px-6 py-2 bg-neutral-900/80 border border-white/10 rounded-lg text-white font-sans text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
               )}
             </>
           ) : (

@@ -19,6 +19,7 @@ export interface CatalogSearchInput {
   set?: string;
   number?: string;
   game?: "pokemon" | "mtg" | "both";
+  page?: number;
 }
 
 export interface CatalogCard {
@@ -48,10 +49,13 @@ const MAX_AUTO_SYNCED_SETS = 5;
  */
 export async function searchCatalog(
   input: CatalogSearchInput
-): Promise<{ results: CatalogCard[]; setsSynced: string[] }> {
+): Promise<{ results: CatalogCard[]; setsSynced: string[]; hasMore: boolean }> {
   let name = input.name?.trim() ?? "";
   let set = input.set?.trim() ?? "";
   let number = input.number?.trim() ?? "";
+  const page = input.page || 1;
+  const PAGE_SIZE = 50;
+  const skip = (page - 1) * PAGE_SIZE;
 
   // Smart parser: If user typed "Abaddon 40K 319" into name
   if (!set && !number && name) {
@@ -79,12 +83,15 @@ export async function searchCatalog(
   const setsSynced: string[] = [];
   
   let mapped: CatalogCard[] = [];
+  let scryfallHasMore = false;
+  let pokemonHasMore = false;
 
   // MTG Scryfall Search
   if (games.includes("MTG") && (name || set || number)) {
     try {
-      const scryfallCards = await searchScryfall(name, set, number);
-      for (const c of scryfallCards) {
+      const scryfallRes = await searchScryfall(name, set, number, page);
+      scryfallHasMore = scryfallRes.has_more;
+      for (const c of scryfallRes.data) {
         // Many Scryfall cards have multiple faces. Use front face name if available.
         const cardName = c.name.includes(" // ") ? c.name.split(" // ")[0] : c.name;
         
@@ -178,11 +185,15 @@ export async function searchCatalog(
     if (Object.keys(where).length > 1) {
       const results = await prisma.cardReference.findMany({
         where,
-        take: 30,
+        take: PAGE_SIZE + 1,
+        skip,
         orderBy: [{ marketPrice: "desc" }, { name: "asc" }],
       });
       
-      mapped.push(...results.map((c) => ({
+      pokemonHasMore = results.length > PAGE_SIZE;
+      const paginatedResults = results.slice(0, PAGE_SIZE);
+
+      mapped.push(...paginatedResults.map((c) => ({
         tcgcsvId: c.tcgcsvId,
         name: c.name,
         setName: c.setName,
@@ -201,7 +212,7 @@ export async function searchCatalog(
   // Sort combined results by price
   mapped.sort((a, b) => b.marketPrice - a.marketPrice);
   
-  return { results: mapped.slice(0, 50), setsSynced };
+  return { results: mapped, setsSynced, hasMore: scryfallHasMore || pokemonHasMore };
 
 }
 
