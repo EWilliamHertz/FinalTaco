@@ -290,8 +290,9 @@ function SearchPage() {
                   No results match the selected filters.
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {processedResults.map((card) => (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {processedResults.map((card) => (
 
                 <div 
                   key={card.tcgcsvId} 
@@ -354,6 +355,7 @@ function SearchPage() {
                     Next
                   </button>
                 </div>
+                </>
               )}
             </>
           ) : (
