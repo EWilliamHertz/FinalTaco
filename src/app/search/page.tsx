@@ -52,20 +52,56 @@ function SearchPage() {
   const [filterSets, setFilterSets] = useState<Set<string>>(new Set());
   const [filterRarities, setFilterRarities] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<string>("RELEVANCE");
+  const [activeTab, setActiveTab] = useState<"singles" | "sealed">("singles");
+
+  
+  const isSealedProduct = (c: CatalogCard) => {
+    if (c.number || c.rarity) return false;
+    const name = c.name.toLowerCase();
+    if (name.includes("booster") || name.includes("box") || name.includes("pack") || name.includes("deck") || name.includes("case") || name.includes("tin") || name.includes("blister") || name.includes("collection") || name.includes("elite trainer")) return true;
+    return true; // if no number/rarity and no matching keywords, assume sealed for safety, or we could assume single? Let's assume sealed if it has no number or rarity, usually true for supplies/sealed. Wait, promos might not have number? They usually have rarity "Promo" or number.
+  };
 
   const processedResults = useMemo(() => {
     let res = [...results];
-    if (filterGames.size > 0) res = res.filter(r => (r as any).game && filterGames.has((r as any).game.toUpperCase()));
-    if (filterSets.size > 0) res = res.filter(r => filterSets.has(r.setName));
-    if (filterRarities.size > 0) res = res.filter(r => r.rarity && filterRarities.has(r.rarity));
-
-    if (sortBy === "PRICE_ASC") res.sort((a, b) => (a.marketPrice || 0) - (b.marketPrice || 0));
-    else if (sortBy === "PRICE_DESC") res.sort((a, b) => (b.marketPrice || 0) - (a.marketPrice || 0));
-    else if (sortBy === "NAME_ASC") res.sort((a, b) => a.name.localeCompare(b.name));
-    else if (sortBy === "NAME_DESC") res.sort((a, b) => b.name.localeCompare(a.name));
     
-    return res;
+    // Explode results for foil/reverse foil
+    let exploded: (CatalogCard & { subTypeName: string; displayPrice: number })[] = [];
+    res.forEach(r => {
+      let hasAnyPrice = false;
+      if (r.marketPrice && r.marketPrice > 0) {
+        exploded.push({ ...r, subTypeName: "Normal", displayPrice: r.marketPrice });
+        hasAnyPrice = true;
+      }
+      if (r.foilPrice && r.foilPrice > 0) {
+        exploded.push({ ...r, subTypeName: "Foil", displayPrice: r.foilPrice });
+        hasAnyPrice = true;
+      }
+      if (r.reversePrice && r.reversePrice > 0) {
+        exploded.push({ ...r, subTypeName: "Reverse Holofoil", displayPrice: r.reversePrice });
+        hasAnyPrice = true;
+      }
+      if (!hasAnyPrice) {
+        exploded.push({ ...r, subTypeName: "Normal", displayPrice: 0 });
+      }
+    });
+
+    if (filterGames.size > 0) exploded = exploded.filter(r => (r as any).game && filterGames.has((r as any).game.toUpperCase()));
+    if (filterSets.size > 0) exploded = exploded.filter(r => filterSets.has(r.setName));
+    if (filterRarities.size > 0) exploded = exploded.filter(r => r.rarity && filterRarities.has(r.rarity));
+
+    if (sortBy === "PRICE_ASC") exploded.sort((a, b) => a.displayPrice - b.displayPrice);
+    else if (sortBy === "PRICE_DESC") exploded.sort((a, b) => b.displayPrice - a.displayPrice);
+    else if (sortBy === "NAME_ASC") exploded.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sortBy === "NAME_DESC") exploded.sort((a, b) => b.name.localeCompare(a.name));
+    
+    return exploded;
   }, [results, filterGames, filterSets, filterRarities, sortBy]);
+
+  const singles = processedResults.filter(r => !isSealedProduct(r));
+  const sealed = processedResults.filter(r => isSealedProduct(r));
+  const displayItems = activeTab === "singles" ? singles : sealed;
+
 
   const uniqueGames = useMemo(() => Array.from(new Set(results.map(r => (r as any).game?.toUpperCase() || ""))).filter(Boolean), [results]);
   const uniqueSets = useMemo(() => Array.from(new Set(results.map(r => r.setName))).filter(Boolean).sort(), [results]);
@@ -109,7 +145,7 @@ function SearchPage() {
     performSearch();
   }, [name, set, number, user, activeGame, page]);
 
-  const openAddModal = (card: CatalogCard) => {
+  const openAddModal = (card: CatalogCard & { subTypeName?: string }) => {
     if (added[card.tcgcsvId]) {
       toast.info("This card is already added during this session.");
       return;
@@ -117,9 +153,9 @@ function SearchPage() {
     setSelectedCard(card);
     setVaultQuantity(1);
     setVaultCondition("NEAR_MINT");
-    setVaultNotes("");
-    setIsFoil(false);
-    setIsReverse(false);
+    setVaultNotes(card.subTypeName === "Foil" || card.subTypeName === "Holofoil" ? "Foil" : card.subTypeName === "Reverse Holofoil" ? "Reverse Holo" : "");
+    setIsFoil(card.subTypeName === "Foil" || card.subTypeName === "Holofoil");
+    setIsReverse(card.subTypeName === "Reverse Holofoil");
     setIsSigned(false);
     setCustomPrice("");
   };
@@ -292,10 +328,10 @@ function SearchPage() {
               ) : (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                    {processedResults.map((card) => (
+                    {displayItems.map((card) => (
 
                 <div 
-                  key={card.tcgcsvId} 
+                  key={`${card.tcgcsvId}-${(card as any).subTypeName}`} 
                   className="group relative cursor-pointer"
                   onClick={() => openAddModal(card)}
                 >
@@ -314,16 +350,23 @@ function SearchPage() {
                     ) : (
                       <div className="w-full h-full bg-neutral-900 flex items-center justify-center text-neutral-500 font-serif text-xs">No Image</div>
                     )}
-                    {card.marketPrice > 0 && (
+                    {(card as any).displayPrice > 0 && (
                       <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded text-[9px] font-serif text-white border border-white/10">
-                        ${card.marketPrice.toFixed(2)}
+                        ${(card as any).displayPrice.toFixed(2)}
                       </div>
                     )}
                   </div>
                   <h3 className="font-serif text-white text-sm truncate group-hover:text-blue-400 transition-colors">{card.name}</h3>
-                  <p className="font-sans text-[9px] uppercase tracking-widest text-neutral-500 truncate">
-                    {card.setName} {card.number && `• #${card.number}`}
-                  </p>
+                  <div className="flex flex-col gap-0.5 mt-0.5">
+                    <p className="font-sans text-[9px] uppercase tracking-widest text-neutral-500 truncate">
+                      {card.setName} {card.number && `• #${card.number}`}
+                    </p>
+                    {(card as any).subTypeName && (card as any).subTypeName !== "Normal" && (
+                      <p className="font-sans text-[8px] uppercase tracking-widest text-purple-400">
+                        {(card as any).subTypeName}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ))}
                 </div>
