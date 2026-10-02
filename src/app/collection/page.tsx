@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useGameStore } from "@/lib/store";
 import { motion } from "framer-motion";
-import { TrendingUp, Lock, Plus, Search, Check, X, Tag, DollarSign, Trash2 } from "lucide-react";
+import { TrendingUp, Lock, Plus, Search, Check, X, Tag, DollarSign, Trash2, Camera } from "lucide-react";
 import { getVault, removeFromVault } from "@/app/actions/vault";
 import { MultiSelect } from "@/components/MultiSelect";
 import { toast } from "react-toastify";
@@ -12,6 +12,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { proxiedImage } from "@/lib/images";
+import FoilCard from "@/components/FoilCard";
 
 interface VaultCard {
   id: string;
@@ -512,9 +513,9 @@ export default function CollectionPage() {
                           : "bg-neutral-900/40 border-white/5 hover:bg-neutral-900"
                       }`}
                     >
-                      <div className="relative aspect-[63/88] rounded-lg overflow-hidden bg-black">
+                      <div className="relative aspect-[63/88] rounded-lg overflow-hidden bg-black [perspective:1000px]">
                         {instance.Card.imageUrl ? (
-                          <Image src={proxiedImage(instance.Card.imageUrl)!} alt={instance.Card.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" unoptimized />
+                          <FoilCard src={proxiedImage(instance.Card.imageUrl)!} alt={instance.Card.name} isFoil={Boolean(instance.notes?.toLowerCase().match(/foil|holo/) || instance.Card.rarity?.toLowerCase().match(/mythic|holo|rare/))} />
                         ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-neutral-800 font-serif text-xs">No Image</div>
                         )}

@@ -6,8 +6,10 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { checkEmail, loginUser, registerUser } from "@/app/actions/auth";
 import { toast } from "react-toastify";
+import { useGameStore } from "@/lib/store";
 
 export default function AuthPage() {
+  const activeGame = useGameStore((state) => state.activeGame);
   const [email, setEmail] = useState("");
   const [step, setStep] = useState<"email" | "login" | "register" | "verify">("email");
   
@@ -60,7 +62,7 @@ export default function AuthPage() {
     e.preventDefault();
     const res = await loginUser(email, password);
     if (res.success) {
-      router.push("/select");
+      router.push(activeGame ? "/feed" : "/select");
     } else {
       toast.error(res.error);
     }
@@ -74,7 +76,7 @@ export default function AuthPage() {
     }
     const res = await registerUser(email, username, password);
     if (res.success) {
-      router.push("/select");
+      router.push(activeGame ? "/feed" : "/select");
     } else {
       toast.error(res.error);
     }

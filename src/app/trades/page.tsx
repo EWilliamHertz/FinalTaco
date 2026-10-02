@@ -115,7 +115,11 @@ export default async function TradesPage() {
                 </div>
 
                 {trade.status === 'PENDING' && (
-                  <div className="mt-8 pt-4 border-t border-white/5 flex justify-end">
+                  <div className="mt-8 pt-4 border-t border-white/5 flex flex-wrap items-center justify-between gap-4">
+                    <Link href={`/trades/${trade.id}`} className="flex items-center gap-2 px-6 py-3 bg-purple-500/10 text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 transition-colors rounded-lg font-sans text-[10px] uppercase tracking-widest">
+                      <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                      Enter Live Room
+                    </Link>
                     <TradeActionClient tradeId={trade.id} isSender={isSender} />
                   </div>
                 )}

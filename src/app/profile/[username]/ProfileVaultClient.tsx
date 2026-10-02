@@ -5,6 +5,8 @@ import Image from "next/image";
 import { getUserVault } from "@/app/actions/user";
 import { proxiedImage } from "@/lib/images";
 import { MultiSelect } from "@/components/MultiSelect";
+import { LayoutGrid, List } from "lucide-react";
+import FoilCard from "@/components/FoilCard";
 
 export default function ProfileVaultClient({ username }: { username: string }) {
   const [vault, setVault] = useState<any[]>([]);
@@ -12,6 +14,7 @@ export default function ProfileVaultClient({ username }: { username: string }) {
   const [activeGames, setActiveGames] = useState<Set<string>>(new Set());
   const [filterConditions, setFilterConditions] = useState<Set<string>>(new Set());
   const [filterVariants, setFilterVariants] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   
   const [sortBy, setSortBy] = useState<"NEWEST" | "PRICE_DESC" | "PRICE_ASC" | "NAME_ASC" | "NAME_DESC">("NEWEST");
 
@@ -143,6 +146,21 @@ export default function ProfileVaultClient({ username }: { username: string }) {
               placeholder="All Variants"
             />
           )}
+
+          <div className="flex bg-black/50 border border-white/10 rounded-lg p-1 ml-auto">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white/10 text-white" : "text-neutral-500 hover:text-white"}`}
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white/10 text-white" : "text-neutral-500 hover:text-white"}`}
+            >
+              <List size={14} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -158,13 +176,13 @@ export default function ProfileVaultClient({ username }: { username: string }) {
         <div className="py-12 text-center text-neutral-500 font-serif italic border border-white/5 rounded-xl bg-neutral-900/30">
           No cards match the selected filter.
         </div>
-      ) : (
+      ) : viewMode === "grid" ? (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {sortedAndFilteredVault.map((instance) => (
             <div key={instance.id} className="group relative">
-              <div className="relative aspect-[63/88] rounded-xl overflow-hidden border border-white/10 mb-3">
+              <div className="relative aspect-[63/88] rounded-xl overflow-hidden border border-white/10 mb-3 [perspective:1000px]">
                 {instance.Card.imageUrl ? (
-                  <Image src={proxiedImage(instance.Card.imageUrl)!} alt={instance.Card.name} fill className="object-cover" unoptimized />
+                  <FoilCard src={proxiedImage(instance.Card.imageUrl)!} alt={instance.Card.name} isFoil={Boolean(instance.notes?.toLowerCase().match(/foil|holo/) || instance.Card.rarity?.toLowerCase().match(/mythic|holo|rare/))} />
                 ) : (
                   <div className="w-full h-full bg-neutral-900 flex items-center justify-center text-neutral-500 font-serif text-xs">No Image</div>
                 )}
@@ -186,6 +204,50 @@ export default function ProfileVaultClient({ username }: { username: string }) {
                     </span>
                   );
                 })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {sortedAndFilteredVault.map((instance) => (
+            <div key={instance.id} className="flex items-center gap-4 bg-neutral-900/40 border border-white/5 p-3 rounded-xl hover:bg-neutral-900 transition-colors">
+              <div className="relative w-12 aspect-[63/88] rounded shrink-0 overflow-hidden bg-black [perspective:1000px]">
+                {instance.Card.imageUrl ? (
+                  <FoilCard src={proxiedImage(instance.Card.imageUrl)!} alt={instance.Card.name} isFoil={Boolean(instance.notes?.toLowerCase().match(/foil|holo/) || instance.Card.rarity?.toLowerCase().match(/mythic|holo|rare/))} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-neutral-500 font-serif text-[8px]">N/A</div>
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <h3 className="font-serif text-white text-sm truncate">{instance.Card.name}</h3>
+                <p className="font-sans text-[9px] uppercase tracking-widest text-neutral-500 truncate mb-1">
+                  {instance.Card.setName}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-white text-[8px] uppercase font-sans tracking-widest">
+                    {instance.condition.replace('_', ' ')}
+                  </span>
+                  {instance.notes && instance.notes.split(",").map((n: string, i: number) => {
+                    const t = n.trim();
+                    if (!t) return null;
+                    return (
+                      <span key={i} className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] uppercase font-sans tracking-widest">
+                        {t}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              <div className="text-right shrink-0">
+                <p className="font-serif text-white">
+                  ${(instance.customPrice || instance.Card.marketPrice || 0).toFixed(2)}
+                </p>
+                {instance.customPrice && (
+                  <span className="text-[8px] uppercase tracking-widest text-emerald-400">Custom</span>
+                )}
               </div>
             </div>
           ))}
